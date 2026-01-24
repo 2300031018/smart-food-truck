@@ -1,0 +1,4 @@
+html,body,#root { margin:0; padding:0; }
+body { font-family: system-ui, Arial, sans-serif; background:#fafafa; color:#222; }
+a { text-decoration:none; }
+button { font-family: inherit; padding:6px 12px; }

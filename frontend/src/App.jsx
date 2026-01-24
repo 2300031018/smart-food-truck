@@ -1,0 +1,73 @@
+import { Routes, Route, Navigate } from 'react-router-dom';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import Trucks from './pages/Trucks';
+import TruckDetail from './pages/TruckDetail';
+import MenuManage from './pages/MenuManage';
+import OrderCreate from './pages/OrderCreate';
+import ReservationCreate from './pages/ReservationCreate';
+import Orders from './pages/Orders';
+import Reservations from './pages/Reservations';
+import Layout from './components/Layout';
+import RoleRoute from './components/RoleRoute';
+import DashboardAdmin from './pages/DashboardAdmin';
+import AdminHierarchy from './pages/AdminHierarchy';
+import AdminManagersOverview from './pages/AdminManagersOverview';
+import AdminManagers from './pages/AdminManagers';
+import AdminStaff from './pages/AdminStaff';
+import DashboardManager from './pages/DashboardManager';
+import ManagerStaff from './pages/ManagerStaff';
+import DashboardStaff from './pages/DashboardStaff';
+import StaffStock from './pages/StaffStock';
+import DashboardCustomer from './pages/DashboardCustomer';
+import { AuthProvider, useAuth } from './context/AuthContext';
+
+function Protected({ children }) {
+  const { token } = useAuth();
+  if (!token) return <Navigate to="/login" replace />;
+  return children;
+}
+
+function HomeRedirect() {
+  const { token, user } = useAuth();
+  if (!token) return <Navigate to="/trucks" replace />;
+  const role = user?.role;
+  const dest = role === 'customer' ? '/customer'
+    : role === 'admin' ? '/admin'
+    : role === 'manager' ? '/manager'
+    : role === 'staff' ? '/staff'
+    : '/trucks';
+  return <Navigate to={dest} replace />;
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<HomeRedirect />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/trucks" element={<Trucks />} />
+          <Route path="/trucks/:id" element={<TruckDetail />} />
+          <Route path="/trucks/:id/menu-manage" element={<RoleRoute roles={['admin','manager']}><MenuManage /></RoleRoute>} />
+          <Route path="/admin" element={<RoleRoute roles={['admin']}><DashboardAdmin /></RoleRoute>} />
+          <Route path="/admin/managers" element={<RoleRoute roles={['admin']}><AdminManagers /></RoleRoute>} />
+          <Route path="/admin/overview" element={<RoleRoute roles={['admin']}><AdminManagersOverview /></RoleRoute>} />
+          <Route path="/admin/hierarchy" element={<RoleRoute roles={['admin']}><AdminHierarchy /></RoleRoute>} />
+          <Route path="/admin/staff" element={<RoleRoute roles={['admin']}><AdminStaff /></RoleRoute>} />
+          <Route path="/manager" element={<RoleRoute roles={['manager']}><DashboardManager /></RoleRoute>} />
+          <Route path="/manager/staff" element={<RoleRoute roles={['manager']}><ManagerStaff /></RoleRoute>} />
+          <Route path="/staff/stock" element={<RoleRoute roles={['staff']}><StaffStock /></RoleRoute>} />
+          <Route path="/staff" element={<RoleRoute roles={['staff']}><DashboardStaff /></RoleRoute>} />
+          <Route path="/customer" element={<RoleRoute roles={['customer']}><DashboardCustomer /></RoleRoute>} />
+          <Route path="/orders" element={<Protected><Orders /></Protected>} />
+          <Route path="/orders/new" element={<Protected><OrderCreate /></Protected>} />
+          <Route path="/reservations" element={<Protected><Reservations /></Protected>} />
+          <Route path="/reservations/new" element={<Protected><ReservationCreate /></Protected>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Layout>
+    </AuthProvider>
+  );
+}
