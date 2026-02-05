@@ -274,80 +274,267 @@ export default function Trucks() {
 }
 
 function TruckDetailCard({ truck, token, user, onClose, managers, updating, setUpdating, handleAssignManager, handleUnassignManager, handleUpdateStatus, handleDeleteTruck }) {
+  const [activeTab, setActiveTab] = useState('info'); // info, menu, order, reserve
+  const [menu, setMenu] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState(null);
+  const [currentTruckId, setCurrentTruckId] = useState(truck.id || truck._id);
+
   const live = truck.liveLocation;
   const base = truck.location;
   const lat = typeof live?.lat === 'number' ? live.lat : (typeof base?.lat === 'number' ? base.lat : null);
   const lng = typeof live?.lng === 'number' ? live.lng : (typeof base?.lng === 'number' ? base.lng : null);
 
+  // Reset state when truck changes
+  useEffect(() => {
+    const newTruckId = truck.id || truck._id;
+    if (newTruckId !== currentTruckId) {
+      setCurrentTruckId(newTruckId);
+      setActiveTab('info');
+      setMenu([]);
+      setCart([]);
+      setNotes('');
+      setSuccess(false);
+      setError(null);
+    }
+  }, [truck.id, truck._id, currentTruckId]);
+
+  // Load menu when switching to menu or order tab
+  useEffect(() => {
+    if ((activeTab === 'menu' || activeTab === 'order') && menu.length === 0) {
+      api.getMenuItems(truck.id || truck._id).then(r => { if (r.success) setMenu(r.data); });
+    }
+  }, [activeTab, truck.id, truck._id, menu.length]);
+
+  function addToCart(item) {
+    setCart(c => {
+      const existing = c.find(ci => ci.menuItem === item._id);
+      if (existing) {
+        return c.map(ci => ci.menuItem === item._id ? { ...ci, quantity: ci.quantity + 1 } : ci);
+      }
+      return [...c, { menuItem: item._id, name: item.name, quantity: 1, unitPrice: item.price }];
+    });
+  }
+
+  function updateQty(id, qty) {
+    if (qty <= 0) {
+      setCart(c => c.filter(ci => ci.menuItem !== id));
+    } else {
+      setCart(c => c.map(ci => ci.menuItem === id ? { ...ci, quantity: qty } : ci));
+    }
+  }
+
+  async function submitOrder(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      const payload = { truck: truck.id || truck._id, items: cart.map(c => ({ menuItem: c.menuItem, quantity: c.quantity })), notes };
+      const res = await api.createOrder(token, payload);
+      if (res.success) {
+        setSuccess(true);
+        setCart([]);
+        setNotes('');
+        setTimeout(() => setSuccess(false), 3000);
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const total = cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+
   return (
-    <div style={{ padding: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 12 }}>
-        <h3 style={{ margin: 0 }}>{truck.name}</h3>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer' }}>✕</button>
-      </div>
-
-      <div style={{ marginBottom: 12, fontSize: 13 }}>
-        <div style={{ marginBottom: 8 }}>
-          <span style={{ background: truck.status === 'active' ? '#d1fae5' : '#fee2e2', color: truck.status === 'active' ? '#065f46' : '#991b1b', padding: '4px 8px', borderRadius: 4, fontSize: 12 }}>
-            {truck.status}
-          </span>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ padding: 16, borderBottom: '1px solid #eee' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 12 }}>
+          <h3 style={{ margin: 0 }}>{truck.name}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer' }}>✕</button>
         </div>
-        {truck.description && (
-          <p style={{ margin: '0 0 8px 0', fontSize: 12, color: '#555' }}>{truck.description}</p>
-        )}
-        {lat && lng && (
-          <p style={{ margin: '0 0 8px 0', fontSize: 12, color: '#666' }}>
-            📍 {lat.toFixed(4)}, {lng.toFixed(4)}
-          </p>
-        )}
-      </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-        <Link to={`/trucks/${truck.id || truck._id}`} style={{ textDecoration: 'none' }}>
-          <button style={{ width: '100%', padding: '8px 12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-            View Menu
-          </button>
-        </Link>
-        
-        {token && user?.role === 'customer' && (
-          <>
-            <Link to={`/orders/new?truck=${truck.id || truck._id}`} style={{ textDecoration: 'none' }}>
-              <button style={{ width: '100%', padding: '8px 12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                📦 Place Order
-              </button>
-            </Link>
-            <Link to={`/reservations/new?truck=${truck.id || truck._id}`} style={{ textDecoration: 'none' }}>
-              <button style={{ width: '100%', padding: '8px 12px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                📅 Book Truck
-              </button>
-            </Link>
-          </>
-        )}
-      </div>
-
-      {token && user?.role === 'admin' && (
-        <div style={{ borderTop: '1px solid #eee', paddingTop: 12 }}>
+        <div style={{ marginBottom: 12, fontSize: 13 }}>
           <div style={{ marginBottom: 8 }}>
-            <label style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Manager: {truck.manager ? truck.manager.email || truck.manager.name : 'Unassigned'}</label>
-            {!truck.manager && managers.length > 0 && (
-              <select onChange={e => handleAssignManager(truck, e.target.value)} defaultValue='' style={{ width: '100%', padding: 4 }}>
-                <option value='' disabled>Assign manager</option>
-                {managers.map(m => <option key={m.id} value={m.id}>{m.email}</option>)}
-              </select>
-            )}
-            {truck.manager && (
-              <button onClick={() => handleUnassignManager(truck)} disabled={updating === truck.id} style={{ width: '100%', padding: '4px 8px', fontSize: 12 }}>
-                Unassign Manager
-              </button>
-            )}
+            <span style={{ background: truck.status === 'active' ? '#d1fae5' : '#fee2e2', color: truck.status === 'active' ? '#065f46' : '#991b1b', padding: '4px 8px', borderRadius: 4, fontSize: 12 }}>
+              {truck.status}
+            </span>
           </div>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            <button onClick={() => handleUpdateStatus(truck, 'active')} disabled={updating === truck.id || truck.status === 'active'} style={{ flex: 1, fontSize: 12 }}>Active</button>
-            <button onClick={() => handleUpdateStatus(truck, 'offline')} disabled={updating === truck.id || truck.status === 'offline'} style={{ flex: 1, fontSize: 12 }}>Offline</button>
-            <button onClick={() => handleDeleteTruck(truck)} disabled={updating === truck.id} style={{ background: '#b91c1c', color: '#fff', flex: 1, fontSize: 12 }}>Delete</button>
-          </div>
+          {truck.description && (
+            <p style={{ margin: '0 0 8px 0', fontSize: 12, color: '#555' }}>{truck.description}</p>
+          )}
+          {lat && lng && (
+            <p style={{ margin: '0 0 8px 0', fontSize: 12, color: '#666' }}>
+              📍 {lat.toFixed(4)}, {lng.toFixed(4)}
+            </p>
+          )}
         </div>
-      )}
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid #eee', marginBottom: 12 }}>
+          <button onClick={() => setActiveTab('info')} style={{ flex: 1, padding: '8px 12px', background: activeTab === 'info' ? '#2563eb' : '#f5f5f5', color: activeTab === 'info' ? '#fff' : '#333', border: 'none', borderRadius: '4px 4px 0 0', cursor: 'pointer', fontSize: 12 }}>
+            Info
+          </button>
+          {token && user?.role === 'customer' && (
+            <>
+              <button onClick={() => setActiveTab('menu')} style={{ flex: 1, padding: '8px 12px', background: activeTab === 'menu' ? '#2563eb' : '#f5f5f5', color: activeTab === 'menu' ? '#fff' : '#333', border: 'none', borderRadius: '4px 4px 0 0', cursor: 'pointer', fontSize: 12 }}>
+                Menu
+              </button>
+              <button onClick={() => setActiveTab('order')} style={{ flex: 1, padding: '8px 12px', background: activeTab === 'order' ? '#16a34a' : '#f5f5f5', color: activeTab === 'order' ? '#fff' : '#333', border: 'none', borderRadius: '4px 4px 0 0', cursor: 'pointer', fontSize: 12 }}>
+                Order {cart.length > 0 && `(${cart.length})`}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+        {activeTab === 'info' && (
+          <div>
+            {token && user?.role === 'customer' && (
+              <div style={{ marginBottom: 12 }}>
+                <Link to={`/reservations/new?truck=${truck.id || truck._id}`} style={{ textDecoration: 'none' }}>
+                  <button style={{ width: '100%', padding: '8px 12px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                    📅 Book This Truck
+                  </button>
+                </Link>
+              </div>
+            )}
+
+            {token && user?.role === 'admin' && (
+              <div style={{ borderTop: '1px solid #eee', paddingTop: 12 }}>
+                <div style={{ marginBottom: 8 }}>
+                  <label style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Manager: {truck.manager ? truck.manager.email || truck.manager.name : 'Unassigned'}</label>
+                  {!truck.manager && managers.length > 0 && (
+                    <select onChange={e => handleAssignManager(truck, e.target.value)} defaultValue='' style={{ width: '100%', padding: 4 }}>
+                      <option value='' disabled>Assign manager</option>
+                      {managers.map(m => <option key={m.id} value={m.id}>{m.email}</option>)}
+                    </select>
+                  )}
+                  {truck.manager && (
+                    <button onClick={() => handleUnassignManager(truck)} disabled={updating === truck.id} style={{ width: '100%', padding: '4px 8px', fontSize: 12 }}>
+                      Unassign Manager
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  <button onClick={() => handleUpdateStatus(truck, 'active')} disabled={updating === truck.id || truck.status === 'active'} style={{ flex: 1, fontSize: 12 }}>Active</button>
+                  <button onClick={() => handleUpdateStatus(truck, 'offline')} disabled={updating === truck.id || truck.status === 'offline'} style={{ flex: 1, fontSize: 12 }}>Offline</button>
+                  <button onClick={() => handleDeleteTruck(truck)} disabled={updating === truck.id} style={{ background: '#b91c1c', color: '#fff', flex: 1, fontSize: 12 }}>Delete</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'menu' && (
+          <div>
+            {cart.length > 0 && token && user?.role === 'customer' && (
+              <div style={{ marginBottom: 16, padding: 12, background: '#f0f9ff', borderRadius: 4, border: '1px solid #bfdbfe' }}>
+                <div style={{ fontSize: 12, marginBottom: 8, color: '#1e40af' }}>
+                  <strong>🛒 Cart: {cart.length} item(s)</strong> · Total: <strong>₹{cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0).toFixed(2)}</strong>
+                </div>
+                <button onClick={() => setActiveTab('order')} style={{ width: '100%', padding: '6px 12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11, fontWeight: 'bold' }}>
+                  View Cart & Checkout →
+                </button>
+              </div>
+            )}
+            <h4 style={{ margin: '0 0 12px 0', fontSize: 14 }}>Menu Items</h4>
+            {menu.length === 0 ? (
+              <p style={{ fontSize: 12, color: '#666' }}>No menu items available</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {menu.map(item => {
+                  const inCart = cart.find(c => c.menuItem === item._id);
+                  const isSoldOut = item.availability === 'sold-out';
+                  return (
+                    <div key={item._id} style={{ padding: 10, border: '1px solid #ddd', borderRadius: 6, background: inCart ? '#f0f9ff' : '#fff', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: 6 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 2 }}>{item.name}</div>
+                          <div style={{ fontSize: 13, color: '#16a34a', fontWeight: 'bold' }}>₹{item.price.toFixed(2)}</div>
+                        </div>
+                        {token && user?.role === 'customer' && !isSoldOut && (
+                          <button onClick={() => addToCart(item)} style={{ padding: '6px 14px', fontSize: 12, background: inCart ? '#2563eb' : '#16a34a', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                            {inCart ? '+ More' : '+ Add'}
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, fontSize: 11 }}>
+                        {isSoldOut && (
+                          <span style={{ color: '#b91c1c', fontWeight: 'bold', background: '#fee2e2', padding: '2px 6px', borderRadius: 3 }}>SOLD OUT</span>
+                        )}
+                        {inCart && (
+                          <span style={{ color: '#2563eb', fontWeight: 'bold', background: '#dbeafe', padding: '2px 6px', borderRadius: 3 }}>✓ In cart ({inCart.quantity})</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'order' && (
+          <div>
+            <h4 style={{ margin: '0 0 12px 0', fontSize: 14 }}>Your Order</h4>
+            {cart.length === 0 ? (
+              <div style={{ padding: 20, textAlign: 'center', color: '#666', fontSize: 12 }}>
+                <p>Your cart is empty</p>
+                <button onClick={() => setActiveTab('menu')} style={{ padding: '6px 12px', fontSize: 11, background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                  Browse Menu
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={submitOrder}>
+                <div style={{ marginBottom: 12 }}>
+                  {cart.map(item => (
+                    <div key={item.menuItem} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, padding: 8, background: '#f9fafb', borderRadius: 4 }}>
+                      <div style={{ flex: 1, fontSize: 12 }}>
+                        <div style={{ fontWeight: 'bold' }}>{item.name}</div>
+                        <div style={{ fontSize: 11, color: '#666' }}>₹{item.unitPrice.toFixed(2)} each</div>
+                      </div>
+                      <input type="number" min={0} value={item.quantity} onChange={e => updateQty(item.menuItem, Number(e.target.value))} style={{ width: 50, padding: 4, fontSize: 12 }} />
+                      <div style={{ fontSize: 12, fontWeight: 'bold', minWidth: 60, textAlign: 'right' }}>
+                        ₹{(item.unitPrice * item.quantity).toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ borderTop: '1px solid #eee', paddingTop: 12, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 'bold', marginBottom: 12 }}>
+                    <span>Total:</span>
+                    <span>₹{total.toFixed(2)}</span>
+                  </div>
+                  <textarea placeholder="Special instructions (optional)" value={notes} onChange={e => setNotes(e.target.value)} style={{ width: '100%', padding: 8, fontSize: 12, minHeight: 60, borderRadius: 4, border: '1px solid #ddd' }} />
+                </div>
+
+                <button type="submit" disabled={submitting || cart.length === 0} style={{ width: '100%', padding: '10px 12px', fontSize: 13, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold' }}>
+                  {submitting ? 'Placing Order...' : `Place Order (₹${total.toFixed(2)})`}
+                </button>
+
+                {success && (
+                  <div style={{ marginTop: 8, padding: 8, background: '#d1fae5', color: '#065f46', borderRadius: 4, fontSize: 12 }}>
+                    ✓ Order placed successfully!
+                  </div>
+                )}
+                {error && (
+                  <div style={{ marginTop: 8, padding: 8, background: '#fee2e2', color: '#b91c1c', borderRadius: 4, fontSize: 12 }}>
+                    {error}
+                  </div>
+                )}
+              </form>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
