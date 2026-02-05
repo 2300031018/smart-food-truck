@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
-
+//this module is for admin to view and manage reservations
 const STATUS_OPTIONS = ['pending','confirmed','cancelled','completed'];
 
 export default function AdminReservations() {
