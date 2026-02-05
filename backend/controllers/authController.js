@@ -17,7 +17,7 @@ exports.signup = async (req, res) => {
   const payload = { user: { id: user._id, role: user.role, assignedTruck: user.assignedTruck || null } };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 
-    return res.status(201).json(buildSuccess({ token, user: { id: user._id, role: user.role, email: user.email } }));
+    return res.status(201).json(buildSuccess({ token, user: { id: user._id, role: user.role, email: user.email, name: user.name, assignedTruck: user.assignedTruck } }));
   } catch (err) {
     console.error('Signup error:', err.message);
     return res.status(500).json(buildError('Server error'));
@@ -75,7 +75,7 @@ exports.login = async (req, res) => {
     await user.save({ validateBeforeSave: false });
     const elapsed = Date.now() - start;
     console.info(`[AUTH][LOGIN] success user=${user._id} role=${user.role} in ${elapsed}ms`);
-    return res.json(buildSuccess({ token, user: { id: user._id, role: user.role, email: user.email } }));
+    return res.json(buildSuccess({ token, user: { id: user._id, role: user.role, email: user.email, name: user.name, assignedTruck: user.assignedTruck } }));
   } catch (err) {
     console.error('[AUTH][LOGIN] unexpected error:', err && err.stack ? err.stack : err);
     return res.status(500).json(buildError('Server error'));

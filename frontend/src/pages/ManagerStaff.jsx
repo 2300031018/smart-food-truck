@@ -54,50 +54,63 @@ export default function ManagerStaff(){
   if (error) return <p style={{ padding:20, color:'red' }}>{error}</p>;
 
   return (
-    <div style={{ padding:20, fontFamily:'system-ui' }}>
-      <h2>My Staff</h2>
-      <div style={{ display:'flex', gap:12, alignItems:'center', marginBottom:12, flexWrap:'wrap' }}>
+    <div className="dashboard-container">
+      <div className="page-header">
+        <h2>My Staff</h2>
+      </div>
+
+      <div className="card" style={{ display:'flex', gap:20, alignItems:'center', flexWrap:'wrap' }}>
         <div>
-          <label style={{ marginRight:6 }}>View:</label>
+          <label style={{ marginRight:8, fontWeight:500 }}>View:</label>
           <select value={viewFilter} onChange={e=> setViewFilter(e.target.value)}>
-            <option value="active">Active</option>
-            <option value="reclaim">Previously Managed</option>
+            <option value="active">Active Staff</option>
+            <option value="reclaim">Previously Managed (Reclaim)</option>
           </select>
         </div>
         {viewFilter === 'active' && (
           <div>
-            <label style={{ marginRight:6 }}>Truck:</label>
+            <label style={{ marginRight:8, fontWeight:500 }}>Filter by Truck:</label>
             <select value={filterTruck} onChange={e=> setFilterTruck(e.target.value)}>
-              <option value="all">All</option>
+              <option value="all">All Trucks</option>
               {trucks.map(t => <option key={t._id || t.id} value={t._id || t.id}>{t.name}</option>)}
             </select>
           </div>
         )}
       </div>
-      <table style={{ width:'100%', borderCollapse:'collapse' }}>
-        <thead>
-          <tr>
-            <th style={th}>Staff</th>
-            <th style={th}>Truck</th>
-            <th style={th}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map(s => {
-            const id = s.id;
-            const assigned = !!s.assignedTruck;
-            const open = !!uiState[id]?.open;
-            const target = uiState[id]?.target || '';
-            return (
-              <tr key={id}>
-                <td style={td}>
-                  <div style={{ fontWeight:600 }}>{s.name}</div>
-                  <div style={{ fontSize:12, color:'#666' }}>{s.email}</div>
-                </td>
-                <td style={td}>{truckMap.get(String(s.assignedTruck))?.name || '—'}</td>
-                <td style={{ ...td, position:'relative' }}>
-                  {viewFilter === 'reclaim' || !assigned ? (
-                    // Unassigned or reclaim: show Assign action only
+
+      <div className="card" style={{ padding:0, overflow:'hidden' }}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Staff Member</th>
+              <th>Assigned Truck</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(s => {
+              const id = s.id;
+              const assigned = !!s.assignedTruck;
+              const open = !!uiState[id]?.open;
+              const target = uiState[id]?.target || '';
+              return (
+                <tr key={id}>
+                  <td>
+                    <div style={{ fontWeight:600 }}>{s.name}</div>
+                    <div style={{ fontSize:13, color:'#6b7280' }}>{s.email}</div>
+                  </td>
+                  <td>
+                    {assigned ? (
+                      <span className="badge badge-green">
+                        {truckMap.get(String(s.assignedTruck))?.name || 'Unknown Truck'}
+                      </span>
+                    ) : (
+                      <span className="badge badge-yellow">Unassigned</span>
+                    )}
+                  </td>
+                  <td style={{ position:'relative' }}>
+                    {viewFilter === 'reclaim' || !assigned ? (
+                      // Unassigned or reclaim: show Assign action only
                     !open ? (
                       <>
                         <button style={btn} onClick={()=> setMenuOpen(m => ({ ...m, [id]: !m[id] }))}>Assign ▾</button>
@@ -182,6 +195,7 @@ export default function ManagerStaff(){
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

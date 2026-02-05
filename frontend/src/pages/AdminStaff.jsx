@@ -1,287 +1,183 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 
 export default function AdminStaff() {
-  const { user, token } = useAuth();
+  const { token, user } = useAuth();
   const [staff, setStaff] = useState([]);
+  const [trucks, setTrucks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [busy, setBusy] = useState({});
-  const [filter, setFilter] = useState('all'); // all|assigned|unassigned
-  const [viewMode, setViewMode] = useState('flat'); // flat | manager
-  const [trucks, setTrucks] = useState([]);
-  const [moveOpen, setMoveOpen] = useState({}); // staffId -> bool
-  const [moveTarget, setMoveTarget] = useState({}); // staffId -> truckId
-  const [menuOpen, setMenuOpen] = useState({}); // staffId -> bool
+  const [busyId, setBusyId] = useState(null);
+  const [form, setForm] = useState({ name:'', email:'', password:'', truckId:'' });
+  const [creating, setCreating] = useState(false);
 
-  async function load(){
-    setLoading(true); setError(null);
+  async function load() {
+    if (!token || user?.role !== 'admin') return;
+    setLoading(true);
+    setError(null);
     try {
-      const res = await api.listStaff(token);
-      if (res.success) setStaff(res.data);
-      // Load active trucks for selection
-      const trucksRes = await api.getTrucks();
-      if (trucksRes.success) setTrucks(trucksRes.data);
-    } catch (e) { setError(e.message); }
-    finally { setLoading(false); }
+      const [staffRes, trucksRes] = await Promise.all([
+        api.listStaff(token),
+        api.getManagedTrucks(token)
+      ]);
+      if (staffRes.success) setStaff(staffRes.data || []);
+      if (trucksRes.success) setTrucks(trucksRes.data || []);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  useEffect(() => { if (token && user?.role==='admin') load(); }, [token, user]);
+  useEffect(() => { load(); }, [token, user]);
+
+  async function submit(e) {
+    e.preventDefault();
+    setCreating(true);
+    setError(null);
+    try {
+      const payload = { name: form.name, email: form.email, password: form.password, truckId: form.truckId };
+      const res = await api.createStaff(token, payload);
+      if (res.success) {
+        setForm({ name:'', email:'', password:'', truckId:'' });
+        await load();
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function assignStaff(id, truckId) {
+    if (!truckId) return;
+    setBusyId(id);
+    setError(null);
+    try {
+      await api.assignStaffToTruck(token, id, truckId);
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function unassignStaff(id) {
+    setBusyId(id);
+    setError(null);
+    try {
+      await api.unassignStaffFromTruck(token, id);
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function toggleActive(id, isActive) {
+    setBusyId(id);
+    setError(null);
+    try {
+      if (isActive) await api.deactivateStaff(token, id);
+      else await api.reactivateStaff(token, id);
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   if (!token) return <p style={{ padding:20 }}>Unauthorized</p>;
-  if (user?.role !== 'admin') return <p style={{ padding:20 }}>Forbidden</p>;
-
-  const truckMap = useMemo(() => {
-    const map = new Map();
-    (trucks||[]).forEach(t => map.set(t.id, t));
-    return map;
-  }, [trucks]);
-
-  const filtered = staff.filter(s => {
-    if (filter==='assigned') return !!s.assignedTruck;
-    if (filter==='unassigned') return !s.assignedTruck;
-    return true;
-  });
-
-  // Group by manager for hierarchical view
-  const groups = useMemo(() => {
-    if (viewMode !== 'manager') return [];
-    const map = new Map(); // key -> { title, items:[] }
-    for (const s of filtered) {
-      const key = s.truckManager?.id ? `mgr:${s.truckManager.id}` : 'unassigned';
-      if (!map.has(key)) {
-        const title = s.truckManager?.id ? `${s.truckManager.name} (${s.truckManager.email})` : 'Unassigned';
-        map.set(key, { title, items: [] });
-      }
-      map.get(key).items.push(s);
-    }
-    // Sort groups: managers alphabetically, unassigned last
-    const entries = Array.from(map.entries());
-    entries.sort((a,b) => {
-      if (a[0] === 'unassigned') return 1;
-      if (b[0] === 'unassigned') return -1;
-      return a[1].title.localeCompare(b[1].title);
-    });
-    return entries.map(([key, val]) => ({ key, ...val }));
-  }, [filtered, viewMode]);
+  if (user?.role !== 'admin') return <p className="dashboard-container">Forbidden</p>;
 
   return (
-    <div style={{ padding:20, fontFamily:'system-ui' }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+    <div className="dashboard-container">
+      <div className="page-header">
         <h2>Admin • Staff Management</h2>
-        <div style={{ display:'flex', gap:8 }}>
-          <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-            <span>View:</span>
-            <select value={viewMode} onChange={e=>setViewMode(e.target.value)}>
-              <option value="flat">Flat</option>
-              <option value="manager">By Manager</option>
-            </select>
-          </label>
-          <label style={{ display:'flex', alignItems:'center', gap:6 }}>
-            <span>Filter:</span>
-            <select value={filter} onChange={e=>setFilter(e.target.value)}>
-              <option value="all">All</option>
-              <option value="assigned">Assigned</option>
-              <option value="unassigned">Unassigned</option>
-            </select>
-          </label>
-        </div>
+      </div>
+
+      <div className="card">
+        <h3>Create Staff</h3>
+        <form onSubmit={submit} className="control-row" style={{ display:'flex', gap:10, alignItems:'center' }}>
+          <input placeholder="Name" value={form.name} onChange={e=> setForm(f => ({ ...f, name:e.target.value }))} required />
+          <input placeholder="Email" type="email" value={form.email} onChange={e=> setForm(f => ({ ...f, email:e.target.value }))} required />
+          <input placeholder="Password" type="password" value={form.password} onChange={e=> setForm(f => ({ ...f, password:e.target.value }))} required />
+          <select value={form.truckId} onChange={e=> setForm(f => ({ ...f, truckId:e.target.value }))} required>
+            <option value="" disabled>Select truck</option>
+            {trucks.map(t => (
+              <option key={t.id || t._id} value={t.id || t._id}>{t.name}</option>
+            ))}
+          </select>
+          <button className="btn btn-primary" disabled={creating}>
+            {creating ? 'Creating…' : 'Create'}
+          </button>
+        </form>
       </div>
 
       {loading && <p>Loading staff…</p>}
       {error && <p style={{ color:'red' }}>{error}</p>}
 
-      {!loading && !error && viewMode === 'flat' && (
-        <table style={{ width:'100%', borderCollapse:'collapse', marginTop:12 }}>
-          <thead>
-            <tr>
-              <th style={th}>Name</th>
-              <th style={th}>Email</th>
-              <th style={th}>Truck</th>
-              <th style={th}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(s => (
-              <tr key={s.id}>
-                <td style={td}>{s.name}</td>
-                <td style={td}>{s.email}</td>
-                <td style={td}>
-                  {s.assignedTruck ? (
-                    (()=>{
-                      const t = truckMap.get(String(s.assignedTruck));
-                      // In flat view we can show the shortId to disambiguate
-                      return t ? `${t.name} (${shortId(t.id)})` : String(s.assignedTruck);
-                    })()
-                  ) : '—'}
-                </td>
-                <td style={{ ...td, position:'relative' }}>
-                  {!moveOpen[s.id] ? (
-                    <>
-                      <button style={btn} onClick={()=> setMenuOpen(m => ({ ...m, [s.id]: !m[s.id] }))}>Manage ▾</button>
-                      {menuOpen[s.id] && (
-                        <div style={menuBox}>
-                          <button style={menuItem} onClick={()=> { setMoveOpen(o => ({ ...o, [s.id]: true })); setMenuOpen(m => ({ ...m, [s.id]: false })); }}>Assign/Move…</button>
-                          {s.assignedTruck && (
-                            <button style={menuItem} disabled={!!busy[`un:${s.id}`]} onClick={async()=>{
-                              setMenuOpen(m => ({ ...m, [s.id]: false }));
-                              setBusy(b => ({ ...b, [`un:${s.id}`]: true }));
-                              try { await api.unassignStaffFromTruck(token, s.id); await load(); } catch(e){ alert(e.message); } finally { setBusy(b => ({ ...b, [`un:${s.id}`]: false })); }
-                            }}>Unassign</button>
-                          )}
-                          {s.isActive ? (
-                            <button style={menuItem} disabled={!!busy[`de:${s.id}`]} onClick={async()=>{
-                              setMenuOpen(m => ({ ...m, [s.id]: false }));
-                              setBusy(b => ({ ...b, [`de:${s.id}`]: true }));
-                              try { await api.deactivateStaff(token, s.id); await load(); } catch(e){ alert(e.message); } finally { setBusy(b => ({ ...b, [`de:${s.id}`]: false })); }
-                            }}>Deactivate</button>
-                          ) : (
-                            <button style={menuItem} disabled={!!busy[`re:${s.id}`]} onClick={async()=>{
-                              setMenuOpen(m => ({ ...m, [s.id]: false }));
-                              setBusy(b => ({ ...b, [`re:${s.id}`]: true }));
-                              try { await api.reactivateStaff(token, s.id); await load(); } catch(e){ alert(e.message); } finally { setBusy(b => ({ ...b, [`re:${s.id}`]: false })); }
-                            }}>Reactivate</button>
-                          )}
-                          <button style={{ ...menuItem, color:'#b00020' }} disabled={!!busy[`del:${s.id}`]} onClick={async()=>{
-                            setMenuOpen(m => ({ ...m, [s.id]: false }));
-                            if (!confirm(`Delete staff ${s.name} (${s.email})? This cannot be undone.`)) return;
-                            setBusy(b => ({ ...b, [`del:${s.id}`]: true }));
-                            try { await api.deleteStaff(token, s.id); await load(); } catch(e){ alert(e.message); } finally { setBusy(b => ({ ...b, [`del:${s.id}`]: false })); }
-                          }}>Delete</button>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <span>
-                      <select value={moveTarget[s.id]||''} onChange={e=> setMoveTarget(m => ({ ...m, [s.id]: e.target.value }))}>
-                        <option value="" disabled>Select Truck</option>
+      {!loading && !error && (
+        <div className="card" style={{ padding:0, overflow:'hidden' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Assigned Truck</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {staff.map(s => (
+                <tr key={s.id}>
+                  <td>{s.name}</td>
+                  <td>{s.email}</td>
+                  <td>{s.assignedTruck ? (trucks.find(t => String(t.id || t._id) === String(s.assignedTruck))?.name || s.assignedTruck) : '—'}</td>
+                  <td>
+                    <span className={`badge ${s.isActive === false ? 'badge-red' : 'badge-green'}`}>
+                      {s.isActive === false ? 'Inactive' : 'Active'}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="btn-group">
+                      <select
+                        style={{ padding:'4px 8px' }}
+                        value={s.assignedTruck || ''}
+                        onChange={e => assignStaff(s.id, e.target.value)}
+                        disabled={busyId === s.id}
+                      >
+                        <option value="">Unassigned</option>
                         {trucks.map(t => (
-                          <option key={t.id} value={t.id}>{t.name} ({shortId(t.id)})</option>
+                          <option key={t.id || t._id} value={t.id || t._id}>{t.name}</option>
                         ))}
                       </select>
-                      <button style={btn} disabled={!!busy[`mv:${s.id}`] || !moveTarget[s.id]} onClick={async()=>{
-                        const truckId = moveTarget[s.id];
-                        if (!truckId) return;
-                        setBusy(b => ({ ...b, [`mv:${s.id}`]: true }));
-                        try { await api.assignStaffToTruck(token, s.id, truckId); await load(); } catch(e){ alert(e.message); } finally { setBusy(b => ({ ...b, [`mv:${s.id}`]: false })); setMoveOpen(o => ({ ...o, [s.id]: false })); setMoveTarget(m => ({ ...m, [s.id]: '' })); }
-                      }}>Apply</button>
-                      <button style={btn} onClick={()=> { setMoveOpen(o => ({ ...o, [s.id]: false })); setMoveTarget(m => ({ ...m, [s.id]: '' })); }}>Cancel</button>
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {!loading && !error && viewMode === 'manager' && (
-        <div style={{ marginTop: 12 }}>
-          {groups.length === 0 ? (
-            <div style={{ color:'#666' }}>No staff match the selected filter.</div>
-          ) : (
-            groups.map(group => (
-              <div key={group.key} style={{ marginBottom: 20 }}>
-                <h3 style={{ margin: '16px 0 8px', display:'flex', alignItems:'center', gap:8 }} title={group.title}>
-                  <span>{group.title.split(' (')[0]}</span>
-                  <span style={badge}>Staff: {group.items.length}</span>
-                </h3>
-                <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={th}>Name</th>
-                      <th style={th}>Email</th>
-                      <th style={th}>Truck</th>
-                      <th style={th}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {group.items.map(s => (
-                      <tr key={s.id}>
-                        <td style={td}>{s.name}</td>
-                        <td style={td}>{s.email}</td>
-                        <td style={td}>
-                          {s.assignedTruck ? (
-                            (()=>{
-                              const t = truckMap.get(String(s.assignedTruck));
-                              // In manager view, avoid repeating the shortId noise; show just the name
-                              return t ? `${t.name}` : String(s.assignedTruck);
-                            })()
-                          ) : '—'}
-                        </td>
-                        <td style={{ ...td, position:'relative' }}>
-                          {!moveOpen[s.id] ? (
-                            <>
-                              <button style={btn} onClick={()=> setMenuOpen(m => ({ ...m, [s.id]: !m[s.id] }))}>Manage ▾</button>
-                              {menuOpen[s.id] && (
-                                <div style={menuBox}>
-                                  <button style={menuItem} onClick={()=> { setMoveOpen(o => ({ ...o, [s.id]: true })); setMenuOpen(m => ({ ...m, [s.id]: false })); }}>Assign/Move…</button>
-                                  {s.assignedTruck && (
-                                    <button style={menuItem} disabled={!!busy[`un:${s.id}`]} onClick={async()=>{
-                                      setMenuOpen(m => ({ ...m, [s.id]: false }));
-                                      setBusy(b => ({ ...b, [`un:${s.id}`]: true }));
-                                      try { await api.unassignStaffFromTruck(token, s.id); await load(); } catch(e){ alert(e.message); } finally { setBusy(b => ({ ...b, [`un:${s.id}`]: false })); }
-                                    }}>Unassign</button>
-                                  )}
-                                  {s.isActive ? (
-                                    <button style={menuItem} disabled={!!busy[`de:${s.id}`]} onClick={async()=>{
-                                      setMenuOpen(m => ({ ...m, [s.id]: false }));
-                                      setBusy(b => ({ ...b, [`de:${s.id}`]: true }));
-                                      try { await api.deactivateStaff(token, s.id); await load(); } catch(e){ alert(e.message); } finally { setBusy(b => ({ ...b, [`de:${s.id}`]: false })); }
-                                    }}>Deactivate</button>
-                                  ) : (
-                                    <button style={menuItem} disabled={!!busy[`re:${s.id}`]} onClick={async()=>{
-                                      setMenuOpen(m => ({ ...m, [s.id]: false }));
-                                      setBusy(b => ({ ...b, [`re:${s.id}`]: true }));
-                                      try { await api.reactivateStaff(token, s.id); await load(); } catch(e){ alert(e.message); } finally { setBusy(b => ({ ...b, [`re:${s.id}`]: false })); }
-                                    }}>Reactivate</button>
-                                  )}
-                                  <button style={{ ...menuItem, color:'#b00020' }} disabled={!!busy[`del:${s.id}`]} onClick={async()=>{
-                                    setMenuOpen(m => ({ ...m, [s.id]: false }));
-                                    if (!confirm(`Delete staff ${s.name} (${s.email})? This cannot be undone.`)) return;
-                                    setBusy(b => ({ ...b, [`del:${s.id}`]: true }));
-                                    try { await api.deleteStaff(token, s.id); await load(); } catch(e){ alert(e.message); } finally { setBusy(b => ({ ...b, [`del:${s.id}`]: false })); }
-                                  }}>Delete</button>
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <span>
-                              <select value={moveTarget[s.id]||''} onChange={e=> setMoveTarget(m => ({ ...m, [s.id]: e.target.value }))}>
-                                <option value="" disabled>Select Truck</option>
-                                {trucks.map(t => (
-                                  <option key={t.id} value={t.id}>{t.name} ({shortId(t.id)})</option>
-                                ))}
-                              </select>
-                              <button style={btn} disabled={!!busy[`mv:${s.id}`] || !moveTarget[s.id]} onClick={async()=>{
-                                const truckId = moveTarget[s.id];
-                                if (!truckId) return;
-                                setBusy(b => ({ ...b, [`mv:${s.id}`]: true }));
-                                try { await api.assignStaffToTruck(token, s.id, truckId); await load(); } catch(e){ alert(e.message); } finally { setBusy(b => ({ ...b, [`mv:${s.id}`]: false })); setMoveOpen(o => ({ ...o, [s.id]: false })); setMoveTarget(m => ({ ...m, [s.id]: '' })); }
-                              }}>Apply</button>
-                              <button style={btn} onClick={()=> { setMoveOpen(o => ({ ...o, [s.id]: false })); setMoveTarget(m => ({ ...m, [s.id]: '' })); }}>Cancel</button>
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ))
-          )}
+                      {s.assignedTruck && (
+                        <button className="btn btn-sm btn-danger" onClick={() => unassignStaff(s.id)} disabled={busyId === s.id}>Unassign</button>
+                      )}
+                      <button 
+                        className={`btn btn-sm ${s.isActive === false ? 'btn-primary' : 'btn-danger'}`}
+                        onClick={() => toggleActive(s.id, s.isActive !== false)} 
+                        disabled={busyId === s.id}
+                      >
+                        {s.isActive === false ? 'Reactivate' : 'Deactivate'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {staff.length === 0 && (
+                <tr><td colSpan={5} style={{ textAlign:'center', padding:20 }}>No staff found.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   );
 }
-
-const th = { textAlign:'left', padding:8, background:'#f5f5f5', border:'1px solid #ddd' };
-const td = { padding:8, border:'1px solid #eee' };
-const btn = { padding:'4px 8px', marginRight:6 };
-const badge = { background:'#eef2ff', color:'#3730a3', border:'1px solid #c7d2fe', borderRadius:12, fontSize:12, padding:'2px 8px' };
-const menuBox = { position:'absolute', zIndex:10, background:'#fff', border:'1px solid #ddd', borderRadius:6, boxShadow:'0 4px 10px rgba(0,0,0,0.06)', padding:6, display:'flex', flexDirection:'column', minWidth:160 };
-const menuItem = { textAlign:'left', padding:'6px 8px', background:'transparent', border:'none', cursor:'pointer' };
-
-function shortId(id){ return String(id).slice(0,6); }

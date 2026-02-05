@@ -11,10 +11,11 @@ import Reservations from './pages/Reservations';
 import Layout from './components/Layout';
 import RoleRoute from './components/RoleRoute';
 import DashboardAdmin from './pages/DashboardAdmin';
-import AdminHierarchy from './pages/AdminHierarchy';
-import AdminManagersOverview from './pages/AdminManagersOverview';
 import AdminManagers from './pages/AdminManagers';
 import AdminStaff from './pages/AdminStaff';
+import AdminTrucks from './pages/AdminTrucks';
+import AdminOrders from './pages/AdminOrders';
+import AdminReservations from './pages/AdminReservations';
 import DashboardManager from './pages/DashboardManager';
 import ManagerStaff from './pages/ManagerStaff';
 import DashboardStaff from './pages/DashboardStaff';
@@ -52,10 +53,11 @@ export default function App() {
           <Route path="/trucks/:id" element={<TruckDetail />} />
           <Route path="/trucks/:id/menu-manage" element={<RoleRoute roles={['admin','manager']}><MenuManage /></RoleRoute>} />
           <Route path="/admin" element={<RoleRoute roles={['admin']}><DashboardAdmin /></RoleRoute>} />
+          <Route path="/admin/trucks" element={<RoleRoute roles={['admin']}><AdminTrucks /></RoleRoute>} />
           <Route path="/admin/managers" element={<RoleRoute roles={['admin']}><AdminManagers /></RoleRoute>} />
-          <Route path="/admin/overview" element={<RoleRoute roles={['admin']}><AdminManagersOverview /></RoleRoute>} />
-          <Route path="/admin/hierarchy" element={<RoleRoute roles={['admin']}><AdminHierarchy /></RoleRoute>} />
           <Route path="/admin/staff" element={<RoleRoute roles={['admin']}><AdminStaff /></RoleRoute>} />
+          <Route path="/admin/orders" element={<RoleRoute roles={['admin']}><AdminOrders /></RoleRoute>} />
+          <Route path="/admin/reservations" element={<RoleRoute roles={['admin']}><AdminReservations /></RoleRoute>} />
           <Route path="/manager" element={<RoleRoute roles={['manager']}><DashboardManager /></RoleRoute>} />
           <Route path="/manager/staff" element={<RoleRoute roles={['manager']}><ManagerStaff /></RoleRoute>} />
           <Route path="/staff/stock" element={<RoleRoute roles={['staff']}><StaffStock /></RoleRoute>} />

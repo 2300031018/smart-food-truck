@@ -382,7 +382,7 @@ export default function Orders() {
                   </div>
                 ) : (
                   <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                    {['manager','staff'].includes(user.role) && (
+                    {['manager','staff','admin'].includes(user.role) && (
                       <button onClick={() => advanceStatus(o)} disabled={!getNextStatus(o.status) || ['cancelled','delivered'].includes(o.status)}>Next</button>
                     )}
                     {token && (

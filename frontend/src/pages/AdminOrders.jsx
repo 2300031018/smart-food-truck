@@ -1,0 +1,70 @@
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { api } from '../api/client';
+
+export default function AdminOrders() {
+  const { token, user } = useAuth();
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  async function load() {
+    if (!token || user?.role !== 'admin') return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.getOrders(token);
+      if (res.success) setOrders(res.data || []);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, [token, user]);
+
+  if (!token) return <p style={{ padding:20 }}>Unauthorized</p>;
+  if (user?.role !== 'admin') return <p style={{ padding:20 }}>Forbidden</p>;
+
+  return (
+    <div style={{ padding:20, fontFamily:'system-ui' }}>
+      <h2>Admin • Orders</h2>
+      {loading && <p>Loading orders…</p>}
+      {error && <p style={{ color:'red' }}>{error}</p>}
+
+      {!loading && !error && (
+        <table style={{ width:'100%', borderCollapse:'collapse', marginTop:12 }}>
+          <thead>
+            <tr>
+              <th style={th}>Order</th>
+              <th style={th}>Truck</th>
+              <th style={th}>Total</th>
+              <th style={th}>Status</th>
+              <th style={th}>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orders.map(o => (
+              <tr key={o._id} style={{ borderTop:'1px solid #eee' }}>
+                <td style={td}>{shortId(o._id)}</td>
+                <td style={td}>{o.truck}</td>
+                <td style={td}>${Number(o.total || 0).toFixed(2)}</td>
+                <td style={td}>{o.status}</td>
+                <td style={td}>{formatTS(o.createdAt)}</td>
+              </tr>
+            ))}
+            {orders.length === 0 && (
+              <tr><td style={td} colSpan={5}>No orders found.</td></tr>
+            )}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function shortId(id) { return id ? String(id).slice(-6) : '—'; }
+function formatTS(ts) { if (!ts) return '—'; try { return new Date(ts).toLocaleString(); } catch { return '—'; } }
+const th = { textAlign:'left', padding:6, background:'#f5f5f5', border:'1px solid #ddd', fontSize:12 };
+const td = { padding:6, border:'1px solid #eee', fontSize:13 };

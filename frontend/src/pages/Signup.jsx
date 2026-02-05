@@ -36,7 +36,7 @@ export default function Signup() {
     <div style={{ maxWidth:360, margin:'60px auto', fontFamily:'system-ui' }}>
       <h2>Sign Up</h2>
       <form onSubmit={submit} style={{ display:'flex', flexDirection:'column', gap:12 }}>
-        <input name="name" placeholder="Name" value={form.name} onChange={onChange} />
+        <input name="name" placeholder="Name" value={form.name} onChange={onChange} required />
         <input name="email" type="email" placeholder="Email" value={form.email} onChange={onChange} required />
         <input name="password" type="password" placeholder="Password" value={form.password} onChange={onChange} required />
         <button disabled={loading}>{loading ? 'Creating...' : 'Create Account'}</button>

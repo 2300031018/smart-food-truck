@@ -24,15 +24,15 @@ export default function DashboardManager(){
   }
 
   return (
-    <div style={{ padding:20, fontFamily:'system-ui' }}>
-      <h2>Manager Dashboard</h2>
-      <p>Welcome {user?.email}</p>
-      <nav style={{ marginTop:8 }}>
-        <a href="/manager/staff">Manage My Staff</a>
-      </nav>
-      <section style={{ marginTop:24 }}>
+    <div className="dashboard-container">
+      <div className="page-header">
+        <h2>Manager Dashboard</h2>
+      </div>
+
+      <div className="card">
         <h3>Create Staff</h3>
-        <form onSubmit={submit} style={{ display:'flex', gap:8, flexWrap:'wrap', maxWidth:800 }}>
+        <p style={{ marginBottom: 15, fontSize: 14 }}>Create a new staff account and assign them to one of your trucks.</p>
+        <form onSubmit={submit} className="control-row" style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
           <input placeholder='Name' value={form.name} onChange={e=> setForm(f=>({...f,name:e.target.value}))} required />
           <input placeholder='Email' type='email' value={form.email} onChange={e=> setForm(f=>({...f,email:e.target.value}))} required />
           <input placeholder='Password' type='password' value={form.password} onChange={e=> setForm(f=>({...f,password:e.target.value}))} required />
@@ -40,11 +40,22 @@ export default function DashboardManager(){
             <option value=''>Select Truck</option>
             {trucks.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
           </select>
-          <button disabled={creating}>{creating?'Creating...':'Create Staff'}</button>
+          <button className="btn btn-primary" disabled={creating}>
+            {creating ? 'Creating...' : 'Create Staff'}
+          </button>
         </form>
-        {error && <div style={{ color:'red' }}>{error}</div>}
-        {staff.length>0 && <ul style={{ marginTop:12 }}>{staff.map(s=> <li key={s.id}>{s.email} ({s.role})</li>)}</ul>}
-      </section>
+        {error && <div style={{ color:'red', marginTop:10 }}>{error}</div>}
+        
+        {staff.length > 0 && (
+          <div style={{ marginTop: 20 }}>
+            <h4 style={{ marginBottom: 10 }}>Recently Created</h4>
+            <ul style={{ paddingLeft: 20, margin: 0 }}>
+              {staff.map(s => <li key={s.id}>{s.email} ({s.role})</li>)}
+            </ul>
+          </div>
+        )}
+      </div>
+
       <ManagerMenuPanel />
     </div>
   );

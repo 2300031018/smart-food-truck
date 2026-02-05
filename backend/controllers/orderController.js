@@ -113,9 +113,6 @@ exports.updateStatus = asyncHandler(async (req, res) => {
   if (order.status === 'accepted') order.status = 'preparing';
   if (order.status === 'completed') order.status = 'delivered';
 
-  // Admin is read-only
-  if (req.user.role === 'admin') return res.status(403).json({ success:false, error:{ message:'Admins cannot change order status' } });
-
   // Customer special case: only cancel while pending
   if (req.user.role === 'customer') {
     if (status !== 'cancelled') return res.status(403).json({ success:false, error:{ message:'Customers may only cancel' } });

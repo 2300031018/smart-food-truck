@@ -7,7 +7,7 @@ export default function DashboardCustomer(){
   return (
     <div style={{ padding:20, fontFamily:'system-ui' }}>
       <h2>Customer Dashboard</h2>
-      <p>Welcome {user?.email}</p>
+      <p>Welcome {user?.name || user?.email}</p>
       <ul>
         <li><Link to='/trucks'>Browse Trucks</Link></li>
         <li><Link to='/orders/new'>Create Order</Link></li>

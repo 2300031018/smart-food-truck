@@ -1,70 +1,72 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 
 export default function DashboardAdmin(){
-  const { user } = useAuth();
-  const [form, setForm] = useState({ name:'', email:'', password:'' });
-  const [creating, setCreating] = useState(false);
+  const { user, token } = useAuth();
+  const [trucks, setTrucks] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [created, setCreated] = useState([]);
-  const [cleanupResult, setCleanupResult] = useState(null);
-  const [cleanupBusy, setCleanupBusy] = useState(false);
 
-  async function submit(e){
-    e.preventDefault();
-    setError(null); setCreating(true);
-    try {
-      const data = await api.createManager(localStorage.getItem('sft_token'), form);
-      if (data.success) setCreated(c => [...c, data.data]);
-      setForm({ name:'', email:'', password:'' });
-    } catch (e){ setError(e.message); } finally { setCreating(false); }
-  }
+  useEffect(() => {
+    if (!token || user?.role !== 'admin') return;
+    let mounted = true;
+    setLoading(true);
+    api.getTrucks()
+      .then(res => { if (mounted && res.success) setTrucks(res.data || []); })
+      .catch(e => { if (mounted) setError(e.message); })
+      .finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
+  }, [token, user]);
 
-  async function runCleanup(){
-    setCleanupBusy(true);
-    setCleanupResult(null);
-    setError(null);
-    try {
-      const token = localStorage.getItem('sft_token');
-      const res = await api.cleanupOrphans(token);
-      setCleanupResult(res?.data || res);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setCleanupBusy(false);
-    }
-  }
+  if (!token) return <p style={{ padding:20 }}>Unauthorized</p>;
+  if (user?.role !== 'admin') return <p style={{ padding:20 }}>Forbidden</p>;
 
   return (
     <div style={{ padding:20, fontFamily:'system-ui' }}>
-      <h2>Admin Dashboard</h2>
+      <h2>Admin Console</h2>
       <p>Welcome {user?.email}</p>
-      <nav style={{ marginTop:8, display:'flex', gap:10 }}>
-        <a href="/admin/overview">Managers Overview</a>
-        <a href="/admin/managers">Managers (Reactivate/Reassign)</a>
-        <a href="/admin/hierarchy">Managers → Trucks → Staff</a>
-        <a href="/admin/staff">Manage Staff</a>
+      <nav style={{ display:'flex', flexWrap:'wrap', gap:10, marginTop:10 }}>
+        <Link to="/admin" style={navLink}>Menu</Link>
+        <Link to="/admin/trucks" style={navLink}>Trucks</Link>
+        <Link to="/admin/managers" style={navLink}>Managers</Link>
+        <Link to="/admin/staff" style={navLink}>Staff</Link>
+        <Link to="/admin/orders" style={navLink}>Orders</Link>
+        <Link to="/admin/reservations" style={navLink}>Reservations</Link>
       </nav>
-      <section style={{ marginTop:24 }}>
-        <h3>Create Manager</h3>
-        <form onSubmit={submit} style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-          <input placeholder='Name' value={form.name} onChange={e=> setForm(f=>({...f,name:e.target.value}))} required />
-          <input placeholder='Email' type='email' value={form.email} onChange={e=> setForm(f=>({...f,email:e.target.value}))} required />
-          <input placeholder='Password' type='password' value={form.password} onChange={e=> setForm(f=>({...f,password:e.target.value}))} required />
-          <button disabled={creating}>{creating?'Creating...':'Create'}</button>
-        </form>
-        {error && <div style={{ color:'red' }}>{error}</div>}
-        {created.length>0 && <ul style={{ marginTop:12 }}>{created.map(m=> <li key={m.id}>{m.email} ({m.role})</li>)}</ul>}
-      </section>
-      <section style={{ marginTop:24 }}>
-        <h3>Data Maintenance</h3>
-        <p>Cleanup orphaned data across the project (admin only).</p>
-        <button onClick={runCleanup} disabled={cleanupBusy}>{cleanupBusy ? 'Cleaning…' : 'Cleanup Orphans'}</button>
-        {cleanupResult && (
-          <pre style={{ background:'#f5f5f5', padding:10, marginTop:10, overflowX:'auto' }}>{JSON.stringify(cleanupResult, null, 2)}</pre>
-        )}
-      </section>
+      <p style={{ color:'#555', marginTop:12 }}>
+        Choose a truck to manage its menu (add items and mark Available/Unavailable).
+      </p>
+
+      {loading && <p>Loading trucks…</p>}
+      {error && <p style={{ color:'red' }}>{error}</p>}
+
+      {!loading && !error && (
+        <div style={{ marginTop:12, display:'grid', gap:12 }}>
+          {trucks.map(t => (
+            <div key={t.id || t._id} style={{ border:'1px solid #ddd', borderRadius:6, padding:12, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div>
+                <strong>{t.name}</strong>
+                <div style={{ fontSize:12, color:'#666' }}>Status: {t.status || '—'}</div>
+              </div>
+              <Link to={`/trucks/${t.id || t._id}/menu-manage`} style={{ padding:'6px 10px', border:'1px solid #2563eb', borderRadius:4, color:'#2563eb', textDecoration:'none' }}>
+                Manage Menu
+              </Link>
+            </div>
+          ))}
+          {trucks.length === 0 && <div style={{ color:'#777' }}>No trucks available.</div>}
+        </div>
+      )}
     </div>
   );
 }
+
+const navLink = {
+  padding:'6px 10px',
+  border:'1px solid #ddd',
+  borderRadius:6,
+  textDecoration:'none',
+  color:'#111'
+};
+

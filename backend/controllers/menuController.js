@@ -80,11 +80,7 @@ exports.updateStock = asyncHandler(async (req, res) => {
   const { stockCount, isAvailable } = req.body || {};
   const item = await MenuItem.findById(req.params.id);
   if (!item) return res.status(404).json({ success: false, error: { message: 'Menu item not found' } });
-  const isStaff = req.user && req.user.role === 'staff';
-  // Staff may only decrease availability (mark sold out) and adjust stock; they cannot set available=true directly
-  if (isStaff && typeof isAvailable !== 'undefined' && isAvailable !== false) {
-    return res.status(403).json({ success:false, error:{ message:'Staff can only mark items sold out (isAvailable=false)' } });
-  }
+  
   if (stockCount != null) {
     const n = Number(stockCount);
     if (!Number.isFinite(n) || n < 0) return res.status(400).json({ success:false, error:{ message:'stockCount must be a non-negative number' } });
@@ -93,7 +89,6 @@ exports.updateStock = asyncHandler(async (req, res) => {
     if (item.stockCount === 0) item.isAvailable = false;
   }
   if (typeof isAvailable !== 'undefined') {
-    // At this point, if staff, isAvailable can only be false (enforced above)
     item.isAvailable = !!isAvailable;
   }
   await item.save();

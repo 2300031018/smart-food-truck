@@ -22,10 +22,7 @@ export default function Layout({ children }) {
   } else if (role === 'admin') {
     // Admin — System Control Layer
     navLinks.push(
-      { to: '/admin', label: 'Admin Dashboard' },
-      { to: '/admin/hierarchy', label: 'Hierarchy' },
-      { to: '/admin/staff', label: 'Staff' },
-      { to: '/trucks', label: 'Trucks' }
+      { to: '/admin', label: 'Admin Dashboard' }
     );
   } else if (role === 'manager') {
     // Manager — Operations & Supervision
