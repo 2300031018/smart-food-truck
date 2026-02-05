@@ -137,6 +137,7 @@ export default function Orders() {
   const [chatOrder, setChatOrder] = useState(null);
   const [truckNames, setTruckNames] = useState({}); // id -> name
   const [trucksById, setTrucksById] = useState({}); // id -> truck object
+  const [expandedOrders, setExpandedOrders] = useState(new Set()); // expanded order IDs
   const prevStatusRef = useRef({}); // orderId -> status
   const notifiedRef = useRef(new Set()); // orderIds already notified for 'ready'
   const pollTimerRef = useRef(null);
@@ -150,10 +151,21 @@ export default function Orders() {
     ])
       .then(async ([ordersRes, trucksRes]) => {
         if (!mounted) return;
-        if (ordersRes.success) setOrders(ordersRes.data);
+        let filteredOrders = ordersRes.data || [];
+        
+        // Filter orders if staff is assigned to a specific truck
+        if (user?.role === 'staff' && user?.assignedTruck) {
+          const assignedTruckId = user.assignedTruck;
+          filteredOrders = filteredOrders.filter(o => {
+            const tid = typeof o.truck === 'object' ? (o.truck.id || o.truck._id) : o.truck;
+            return tid === assignedTruckId;
+          });
+        }
+        
+        if (ordersRes.success) setOrders(filteredOrders);
         if (ordersRes.success) {
           const map = {};
-          (ordersRes.data || []).forEach(o => { map[o._id] = o.status; });
+          filteredOrders.forEach(o => { map[o._id] = o.status; });
           prevStatusRef.current = map;
         }
         const nameMap = {};
@@ -164,7 +176,7 @@ export default function Orders() {
         // Ensure we have truck details for any truck referenced by orders but missing from list
         if (ordersRes.success) {
           const missingIds = new Set();
-          for (const o of (ordersRes.data || [])) {
+          for (const o of filteredOrders) {
             const tid = typeof o.truck==='object' ? (o.truck.id||o.truck._id) : o.truck;
             if (tid && !byId[tid]) missingIds.add(tid);
           }
@@ -183,7 +195,7 @@ export default function Orders() {
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
     return () => { mounted = false; };
-  }, [token]);
+  }, [token, user]);
 
   // Request browser notification permission once for customers
   useEffect(() => {
@@ -284,6 +296,16 @@ export default function Orders() {
     setChatOpen(true);
   }
 
+  function toggleExpand(orderId){
+    const newSet = new Set(expandedOrders);
+    if (newSet.has(orderId)) {
+      newSet.delete(orderId);
+    } else {
+      newSet.add(orderId);
+    }
+    setExpandedOrders(newSet);
+  }
+
   function shortId(id){ return typeof id === 'string' ? id.slice(-6) : ''; }
   function orderCode(o){ const sid = shortId(o._id||''); return sid ? `ORD-${sid.toUpperCase()}` : 'ORD-—'; }
   function pickupCode(o){ const sid = shortId(o._id||''); return sid ? sid.toUpperCase() : '—'; }
@@ -345,54 +367,146 @@ export default function Orders() {
         <thead>
           <tr>
             <th style={th}>Order #</th>
-            <th style={th}>Truck</th>
-            <th style={th}>Status</th>
-            <th style={th}>Total</th>
-            <th style={th}>{user?.role==='customer' ? 'Pickup' : 'Action'}</th>
+            {user?.role === 'customer' ? (
+              <>
+                <th style={th}>Truck</th>
+                <th style={th}>Status</th>
+                <th style={th}>Total</th>
+                <th style={th}>Pickup</th>
+              </>
+            ) : user?.role === 'staff' ? (
+              <>
+                <th style={th}>Status</th>
+                <th style={th}>Total</th>
+                <th style={th}>Details</th>
+                <th style={th}>Action</th>
+              </>
+            ) : (
+              <>
+                <th style={th}>Truck</th>
+                <th style={th}>Status</th>
+                <th style={th}>Total</th>
+                <th style={th}>Details</th>
+                <th style={th}>Action</th>
+              </>
+            )}
           </tr>
         </thead>
         <tbody>
-          {orders.map(o => (
-            <tr key={o._id} style={{ borderBottom: '1px solid #ddd' }}>
-              <td style={td}>
-                <div><span title={o._id}>{orderCode(o)}</span></div>
-                <div style={{ fontSize:11, opacity:.7 }}>Pickup Code: <strong>{pickupCode(o)}</strong></div>
-              </td>
-              <td style={td}>{truckLabel(o)}</td>
-              <td style={td}>{displayStatus(o.status)}</td>
-              <td style={td}>{formatCurrency(o.total || 0)}</td>
-              <td style={td}>
-                {user?.role==='customer' ? (
-                  <div>
-                    <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: 6 }}>
-                      <a href={`/trucks/${getTruckId(o)}`} style={{ textDecoration:'none' }}>
-                        <button type="button">View Truck</button>
-                      </a>
-                      {directionsUrl(o) && (
-                        <a href={directionsUrl(o)} target="_blank" rel="noreferrer" style={{ textDecoration:'none' }}>
-                          <button type="button">Directions</button>
-                        </a>
-                      )}
-                      {token && <button onClick={() => openChat(o)}>Chat</button>}
-                    </div>
-                    {coords(o) && (
-                      <MapEmbed lat={coords(o).lat} lng={coords(o).lng} height={160} />
-                    )}
-                    <PickupPlanner order={o} coords={coords(o)} defaultPrep={prepDefault(o)} />
-                  </div>
-                ) : (
-                  <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                    {['manager','staff','admin'].includes(user.role) && (
-                      <button onClick={() => advanceStatus(o)} disabled={!getNextStatus(o.status) || ['cancelled','delivered'].includes(o.status)}>Next</button>
-                    )}
-                    {token && (
-                      <button onClick={() => openChat(o)}>Chat</button>
-                    )}
-                  </div>
+          {orders.map(o => {
+            const isExpanded = expandedOrders.has(o._id);
+            return (
+              <React.Fragment key={o._id}>
+                <tr style={{ borderBottom: '1px solid #ddd' }}>
+                  <td style={td}>
+                    <div><span title={o._id}>{orderCode(o)}</span></div>
+                    <div style={{ fontSize:11, opacity:.7 }}>Pickup Code: <strong>{pickupCode(o)}</strong></div>
+                  </td>
+                  {user?.role === 'customer' && (
+                    <td style={td}>{truckLabel(o)}</td>
+                  )}
+                  {user?.role === 'staff' ? (
+                    <>
+                      <td style={td}>{displayStatus(o.status)}</td>
+                      <td style={td}>{formatCurrency(o.total || 0)}</td>
+                      <td style={td}>
+                        <button onClick={() => toggleExpand(o._id)} style={{ marginBottom: isExpanded ? 6 : 0 }}>
+                          {isExpanded ? '▼ Hide Details' : '▶ View Details'}
+                        </button>
+                      </td>
+                      <td style={td}>
+                        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                          {['manager','staff','admin'].includes(user.role) && (
+                            <button onClick={() => advanceStatus(o)} disabled={!getNextStatus(o.status) || ['cancelled','delivered'].includes(o.status)}>Next</button>
+                          )}
+                          {token && (
+                            <button onClick={() => openChat(o)}>Chat</button>
+                          )}
+                        </div>
+                      </td>
+                    </>
+                  ) : user?.role === 'customer' ? (
+                    <>
+                      <td style={td}>{displayStatus(o.status)}</td>
+                      <td style={td}>{formatCurrency(o.total || 0)}</td>
+                      <td style={td}>
+                        <div>
+                          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: 6 }}>
+                            <a href={`/trucks/${getTruckId(o)}`} style={{ textDecoration:'none' }}>
+                              <button type="button">View Truck</button>
+                            </a>
+                            {directionsUrl(o) && (
+                              <a href={directionsUrl(o)} target="_blank" rel="noreferrer" style={{ textDecoration:'none' }}>
+                                <button type="button">Directions</button>
+                              </a>
+                            )}
+                            {token && <button onClick={() => openChat(o)}>Chat</button>}
+                          </div>
+                          {coords(o) && (
+                            <MapEmbed lat={coords(o).lat} lng={coords(o).lng} height={160} />
+                          )}
+                          <PickupPlanner order={o} coords={coords(o)} defaultPrep={prepDefault(o)} />
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td style={td}>{truckLabel(o)}</td>
+                      <td style={td}>{displayStatus(o.status)}</td>
+                      <td style={td}>{formatCurrency(o.total || 0)}</td>
+                      <td style={td}>
+                        <button onClick={() => toggleExpand(o._id)} style={{ marginBottom: isExpanded ? 6 : 0 }}>
+                          {isExpanded ? '▼ Hide Details' : '▶ View Details'}
+                        </button>
+                      </td>
+                      <td style={td}>
+                        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                          {['manager','staff','admin'].includes(user.role) && (
+                            <button onClick={() => advanceStatus(o)} disabled={!getNextStatus(o.status) || ['cancelled','delivered'].includes(o.status)}>Next</button>
+                          )}
+                          {token && (
+                            <button onClick={() => openChat(o)}>Chat</button>
+                          )}
+                        </div>
+                      </td>
+                    </>
+                  )}
+                </tr>
+                {isExpanded && user?.role !== 'customer' && (
+                  <tr style={{ borderBottom: '1px solid #ddd', background: '#f9fafb' }}>
+                    <td colSpan={user?.role === 'staff' ? 5 : 6} style={{ ...td, paddingTop: 12, paddingBottom: 12 }}>
+                      <div style={{ display: 'grid', gap: 12 }}>
+                        {/* Items section */}
+                        <div>
+                          <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Items Ordered:</h4>
+                          {o.items && o.items.length > 0 ? (
+                            <ul style={{ margin: '0 0 0 16px', padding: 0 }}>
+                              {o.items.map((item, idx) => (
+                                <li key={idx} style={{ marginBottom: 4, fontSize: 13 }}>
+                                  <strong>{item.name}</strong> x {item.quantity} @ ₹{Number(item.unitPrice).toFixed(2)} = ₹{Number(item.lineTotal).toFixed(2)}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p style={{ margin: 0, fontSize: 13, opacity: 0.7 }}>No items</p>
+                          )}
+                        </div>
+                        {/* Notes section */}
+                        {o.notes && (
+                          <div>
+                            <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Customer Notes:</h4>
+                            <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 4, padding: 8, fontSize: 13 }}>
+                              {o.notes}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
                 )}
-              </td>
-            </tr>
-          ))}
+              </React.Fragment>
+            );
+          })}
         </tbody>
       </table>
 
