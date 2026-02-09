@@ -9,6 +9,41 @@ const Order = require('../models/Order');
 const Reservation = require('../models/Reservation');
 const { cacheGet, cacheSet, cacheDelByPrefix } = require('../utils/cache');
 
+function getDefaultRoutePlan() {
+  return {
+    timezone: 'Asia/Kolkata',
+    dailyStart: '09:00',
+    dailyEnd: '11:00',
+    stops: [
+      { name: 'Kanuru', lat: 16.4825, lng: 80.6994, stayMin: 20 },
+      { name: 'Benz Circle', lat: 16.4995, lng: 80.6466, stayMin: 20 },
+      { name: 'McDonalds Gurunanak Colony', lat: 16.5078, lng: 80.6485, stayMin: 20 },
+      { name: 'Autonagar', lat: 16.5135, lng: 80.6826, stayMin: 20 },
+      { name: 'Kanuru', lat: 16.4825, lng: 80.6994, stayMin: 20 }
+    ]
+  };
+}
+
+function ensureRoutePlan(routePlan) {
+  if (!routePlan) return getDefaultRoutePlan();
+  if (!Array.isArray(routePlan.stops) || routePlan.stops.length < 2) return getDefaultRoutePlan();
+  return routePlan;
+}
+
+// PATCH /api/trucks/route-plan-defaults (admin only)
+exports.applyDefaultRoutePlanDefaults = asyncHandler(async (req, res) => {
+  const filter = {
+    $or: [
+      { routePlan: { $exists: false } },
+      { 'routePlan.stops.0': { $exists: false } }
+    ]
+  };
+  const update = { routePlan: getDefaultRoutePlan() };
+  const result = await Truck.updateMany(filter, update);
+  try { await cacheDelByPrefix('trucks:'); } catch {}
+  res.json({ success: true, data: { matched: result.matchedCount || result.n, modified: result.modifiedCount || result.nModified } });
+});
+
 // Create Truck (manager/admin)
 // Admin may pass managerId to assign ownership; manager always becomes owner automatically.
 exports.createTruck = asyncHandler(async (req, res) => {
@@ -23,7 +58,8 @@ exports.createTruck = asyncHandler(async (req, res) => {
     }
     managerToSet = mgr._id;
   }
-  let truck = await Truck.create({ ...rest, manager: managerToSet });
+  const routePlan = rest.routePlan || getDefaultRoutePlan();
+  let truck = await Truck.create({ ...rest, routePlan, manager: managerToSet });
   truck = await Truck.findById(truck._id).populate('manager', 'id email name role');
   try { await cacheDelByPrefix('trucks:'); } catch {}
   res.status(201).json({ success: true, data: truck });
@@ -42,6 +78,7 @@ exports.getTrucks = asyncHandler(async (req, res) => {
     status: t.status,
     location: t.location || null,
     liveLocation: t.liveLocation || null,
+    routePlan: ensureRoutePlan(t.routePlan),
     manager: t.manager ? { id: t.manager.id, email: t.manager.email, name: t.manager.name } : null,
     staffCount: (t.staff || []).length
   }));
@@ -64,6 +101,7 @@ exports.getTruck = asyncHandler(async (req, res) => {
     status: truck.status,
     location: truck.location || null,
     liveLocation: truck.liveLocation || null,
+    routePlan: ensureRoutePlan(truck.routePlan),
     manager: truck.manager ? { id: truck.manager.id, email: truck.manager.email, name: truck.manager.name } : null,
     staffCount: (truck.staff || []).length
   };
@@ -217,6 +255,45 @@ exports.unassignStaff = asyncHandler(async (req, res) => {
   res.json({ success:true, data:{ truckId: truck.id, removedStaffId: staffUser.id } });
 });
 
+// PATCH /api/trucks/:id/route-plan (update predefined route schedule)
+exports.updateRoutePlan = asyncHandler(async (req, res) => {
+  const { routePlan } = req.body || {};
+  if (!routePlan || !Array.isArray(routePlan.stops) || routePlan.stops.length < 2) {
+    return res.status(422).json({ success:false, error:{ message:'routePlan with at least 2 stops is required' } });
+  }
+  const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role');
+  if (!truck) return res.status(404).json({ success:false, error:{ message:'Truck not found' } });
+  // Permission: admin or manager of truck
+  if (req.user.role === 'manager') {
+    if (!truck.manager || truck.manager.id !== req.user.id) {
+      return res.status(403).json({ success:false, error:{ message:'Not manager of this truck' } });
+    }
+  } else if (req.user.role !== 'admin') {
+    return res.status(403).json({ success:false, error:{ message:'Forbidden' } });
+  }
+
+  const cleanedStops = routePlan.stops.map(s => ({
+    name: String(s.name || '').trim(),
+    lat: Number(s.lat),
+    lng: Number(s.lng),
+    stayMin: Math.max(1, Number(s.stayMin || 15))
+  })).filter(s => s.name && Number.isFinite(s.lat) && Number.isFinite(s.lng));
+
+  if (cleanedStops.length < 2) {
+    return res.status(422).json({ success:false, error:{ message:'routePlan stops must include valid name, lat, lng' } });
+  }
+
+  truck.routePlan = {
+    timezone: routePlan.timezone || 'Asia/Kolkata',
+    dailyStart: routePlan.dailyStart || '09:00',
+    dailyEnd: routePlan.dailyEnd || '11:00',
+    stops: cleanedStops
+  };
+  await truck.save();
+  try { await cacheDelByPrefix('trucks:'); } catch {}
+  res.json({ success:true, data:{ id: truck.id, routePlan: truck.routePlan } });
+});
+
 // PATCH /api/trucks/:id/status-location (update status and/or liveLocation)
 exports.updateStatusLocation = asyncHandler(async (req, res) => {
   const { status, liveLocation } = req.body || {};
@@ -257,13 +334,6 @@ exports.updateStatusLocation = asyncHandler(async (req, res) => {
   try { await cacheDelByPrefix('trucks:'); } catch {}
   res.json({ success:true, data:{ id: truck.id, status: truck.status, liveLocation: truck.liveLocation } });
 });
-
-// DELETE /api/trucks/:id (admin or manager who owns the truck)
-// Permanently deletes the truck and performs safe cleanup:
-// - Unassigns any staff assigned to this truck (unset assignedTruck, set lastManager)
-// - Deletes related MenuItem documents
-// - Deletes related Orders and Reservations
-// - Deletes related chat rooms of type 'truck' and 'order'
 exports.deleteTruck = asyncHandler(async (req, res) => {
   const truck = await Truck.findById(req.params.id).populate('manager', 'id _id');
   if (!truck) return res.status(404).json({ success:false, error:{ message:'Truck not found' } });
@@ -302,12 +372,10 @@ exports.deleteTruck = asyncHandler(async (req, res) => {
     }
   } catch {}
 
-  // 4) Delete Reservations for this truck
   try {
     await Reservation.deleteMany({ truck: truck._id });
   } catch {}
 
-  // 5) Delete chat rooms tied directly to the truck
   try {
     const rooms = await ChatRoom.find({ type: 'truck', truck: truck._id }).select('_id');
     const roomIds = rooms.map(r => r._id);
@@ -315,7 +383,6 @@ exports.deleteTruck = asyncHandler(async (req, res) => {
     await ChatRoom.deleteMany({ type: 'truck', truck: truck._id });
   } catch {}
 
-  // 6) Finally, delete the truck itself
   await Truck.deleteOne({ _id: truck._id });
 
   try {

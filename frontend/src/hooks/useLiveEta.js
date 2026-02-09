@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { loadGoogleMapsApi } from './useGoogleMapsApi';
 
 export function useLiveEta({ origin, destination, mode = 'DRIVING', apiKey }) {
   const [minutes, setMinutes] = useState(null);
@@ -10,39 +9,26 @@ export function useLiveEta({ origin, destination, mode = 'DRIVING', apiKey }) {
     let cancelled = false;
     async function run() {
       setStatus('loading'); setError(null);
-      if (!origin || !destination || !apiKey) { setStatus('error'); setError('Missing origin/destination or API key'); return; }
+      if (!origin || !destination) { setStatus('error'); setError('Missing origin/destination'); return; }
       try {
-        const maps = await loadGoogleMapsApi(apiKey);
+        const toRad = (v) => (v * Math.PI) / 180;
+        const R = 6371;
+        const dLat = toRad(destination.lat - origin.lat);
+        const dLon = toRad(destination.lng - origin.lng);
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(toRad(origin.lat)) * Math.cos(toRad(destination.lat)) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distanceKm = R * c;
+        const speedMap = { DRIVING: 25, WALKING: 4.5, CYCLING: 12 };
+        const speed = speedMap[String(mode || '').toUpperCase()] || speedMap.DRIVING;
+        const minutesEst = Math.max(1, Math.round((distanceKm / speed) * 60));
         if (cancelled) return;
-        const svc = new maps.DistanceMatrixService();
-        const req = {
-          origins: [new maps.LatLng(origin.lat, origin.lng)],
-          destinations: [new maps.LatLng(destination.lat, destination.lng)],
-          travelMode: mode,
-          drivingOptions: mode === 'DRIVING' ? { departureTime: new Date() } : undefined,
-          unitSystem: maps.UnitSystem.METRIC,
-        };
-        svc.getDistanceMatrix(req, (res, sts) => {
-          if (cancelled) return;
-          if (sts !== 'OK') {
-            setStatus('error'); setError(sts || 'DistanceMatrix error'); return;
-          }
-          try {
-            const el = res.rows?.[0]?.elements?.[0];
-            const secs = el?.duration_in_traffic?.value || el?.duration?.value;
-            if (typeof secs === 'number') {
-              setMinutes(Math.max(1, Math.round(secs / 60)));
-              setStatus('ok');
-            } else {
-              setStatus('error'); setError('No duration');
-            }
-          } catch (e) {
-            setStatus('error'); setError(e.message || 'Parse error');
-          }
-        });
+        setMinutes(minutesEst);
+        setStatus('ok');
       } catch (e) {
         if (cancelled) return;
-        setStatus('error'); setError(e.message || 'Load error');
+        setStatus('error'); setError(e.message || 'Estimate error');
       }
     }
     run();

@@ -9,7 +9,7 @@ Smart Food Truck is a full-stack web application designed for food truck operato
 **Customer Features**
 Truck Discovery: Browse available food trucks with live locations.
 Order Placement: Place orders from truck menus with real-time prep time tracking.
-Pickup Planning: Get ETA estimates and directions using Google Maps.
+Pickup Planning: Get ETA estimates and directions using OpenStreetMap.
 Reservations: Book seats at trucks for future time slots.
 Order Notifications: Receive notifications when orders are ready for pickup.
 Live Chat: Chat with truck staff for order support.

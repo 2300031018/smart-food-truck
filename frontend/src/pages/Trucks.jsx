@@ -1,12 +1,114 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import L from 'leaflet';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { getSocket } from '../realtime/socket';
-import { loadGoogleMapsApi } from '../hooks/useGoogleMapsApi';
+
+function parseHHMM(value) {
+  if (!value || typeof value !== 'string') return null;
+  const [h, m] = value.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  return h * 60 + m;
+}
+
+function minutesInTimeZone(date, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone
+  }).formatToParts(date);
+  const hour = Number(parts.find(p => p.type === 'hour')?.value);
+  const minute = Number(parts.find(p => p.type === 'minute')?.value);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+}
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function getPlannedLocation(routePlan, now = new Date()) {
+  if (!routePlan || !Array.isArray(routePlan.stops) || routePlan.stops.length < 2) return null;
+  const tz = routePlan.timezone || 'Asia/Kolkata';
+  const nowMin = minutesInTimeZone(now, tz);
+  const startMin = parseHHMM(routePlan.dailyStart || '09:00');
+  const endMin = parseHHMM(routePlan.dailyEnd || '11:00');
+  if (nowMin === null || startMin === null || endMin === null) return routePlan.stops[0];
+  if (nowMin < startMin || nowMin > endMin) return routePlan.stops[0];
+
+  const speedKmh = 20;
+  const segments = [];
+  for (let i = 0; i < routePlan.stops.length - 1; i += 1) {
+    const a = routePlan.stops[i];
+    const b = routePlan.stops[i + 1];
+    const stayMin = Math.max(1, Number(a.stayMin || 15));
+    segments.push({ type: 'stay', stop: a, duration: stayMin });
+    const distanceKm = haversineKm(a.lat, a.lng, b.lat, b.lng);
+    const travelMin = Math.max(1, Math.round((distanceKm / speedKmh) * 60));
+    segments.push({ type: 'travel', from: a, to: b, duration: travelMin });
+  }
+
+  const totalDuration = segments.reduce((sum, s) => sum + s.duration, 0);
+  if (totalDuration <= 0) return routePlan.stops[0];
+  const windowMin = Math.max(1, endMin - startMin);
+  let elapsed = (nowMin - startMin) % windowMin;
+  elapsed = elapsed % totalDuration;
+
+  for (const seg of segments) {
+    if (elapsed <= seg.duration) {
+      if (seg.type === 'stay') return seg.stop;
+      const t = seg.duration === 0 ? 0 : (elapsed / seg.duration);
+      return {
+        lat: seg.from.lat + (seg.to.lat - seg.from.lat) * t,
+        lng: seg.from.lng + (seg.to.lng - seg.from.lng) * t
+      };
+    }
+    elapsed -= seg.duration;
+  }
+  return routePlan.stops[0];
+}
+
+function getDisplayLocation(truck) {
+  const live = truck?.liveLocation;
+  if (typeof live?.lat === 'number' && typeof live?.lng === 'number') {
+    return { lat: live.lat, lng: live.lng };
+  }
+  const planned = getPlannedLocation(truck?.routePlan);
+  if (planned && typeof planned.lat === 'number' && typeof planned.lng === 'number') {
+    return { lat: planned.lat, lng: planned.lng };
+  }
+  const base = truck?.location;
+  if (typeof base?.lat === 'number' && typeof base?.lng === 'number') {
+    return { lat: base.lat, lng: base.lng };
+  }
+  return null;
+}
+
+const defaultRoutePlan = {
+  timezone: 'Asia/Kolkata',
+  dailyStart: '09:00',
+  dailyEnd: '11:00',
+  stops: [
+    { name: 'Kanuru', lat: 16.4825, lng: 80.6994, stayMin: 20 },
+    { name: 'Benz Circle', lat: 16.4995, lng: 80.6466, stayMin: 20 },
+    { name: 'McDonalds Gurunanak Colony', lat: 16.5078, lng: 80.6485, stayMin: 20 },
+    { name: 'Autonagar', lat: 16.5135, lng: 80.6826, stayMin: 20 },
+    { name: 'Kanuru', lat: 16.4825, lng: 80.6994, stayMin: 20 }
+  ]
+};
 
 export default function Trucks() {
   const { token, user } = useAuth();
+  const location = useLocation();
   const [trucks, setTrucks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -15,10 +117,15 @@ export default function Trucks() {
   const [updating, setUpdating] = useState(null);
   const [managers, setManagers] = useState([]);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapError, setMapError] = useState(null);
   const [selectedTruck, setSelectedTruck] = useState(null);
+  const [routeDefaultsBusy, setRouteDefaultsBusy] = useState(false);
   const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
   const markersRef = useRef({});
-  const apiKey = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) || null;
+  const stopMarkersRef = useRef([]);
+  const selectedRouteRef = useRef(null);
+  const allRoutesRef = useRef([]);
 
   useEffect(() => {
     let mounted = true;
@@ -38,68 +145,152 @@ export default function Trucks() {
     return () => { mounted = false; };
   }, [token, user]);
 
-  // Initialize map
   useEffect(() => {
-    if (!mapRef.current || !apiKey || trucks.length === 0) return;
-    
-    (async () => {
-      try {
-        const maps = await loadGoogleMapsApi(apiKey);
-        
-        // Calculate bounds
-        const bounds = new maps.LatLngBounds();
-        trucks.forEach(t => {
-          const live = t.liveLocation;
-          const base = t.location;
-          const lat = typeof live?.lat === 'number' ? live.lat : (typeof base?.lat === 'number' ? base.lat : null);
-          const lng = typeof live?.lng === 'number' ? live.lng : (typeof base?.lng === 'number' ? base.lng : null);
-          if (lat && lng) bounds.extend(new maps.LatLng(lat, lng));
-        });
+    if (!trucks.length) return;
+    const params = new URLSearchParams(location.search || '');
+    const preselectId = params.get('truck');
+    if (!preselectId) return;
+    const match = trucks.find(t => String(t.id || t._id) === String(preselectId));
+    if (match) setSelectedTruck(match);
+  }, [location.search, trucks]);
 
-        // Create map
-        if (!mapRef.current.mapInstance) {
-          mapRef.current.mapInstance = new maps.Map(mapRef.current, {
-            zoom: 12,
-            center: { lat: 20.5937, lng: 78.9629 } // Default to India
-          });
-        }
-        const map = mapRef.current.mapInstance;
+  useEffect(() => {
+    if (!selectedTruck) return;
+    const currentId = selectedTruck.id || selectedTruck._id;
+    const updated = trucks.find(t => (t.id || t._id) === currentId);
+    if (updated && updated !== selectedTruck) setSelectedTruck(updated);
+  }, [trucks, selectedTruck]);
 
-        // Add markers
-        markersRef.current = {};
-        trucks.forEach(t => {
-          const live = t.liveLocation;
-          const base = t.location;
-          const lat = typeof live?.lat === 'number' ? live.lat : (typeof base?.lat === 'number' ? base.lat : null);
-          const lng = typeof live?.lng === 'number' ? live.lng : (typeof base?.lng === 'number' ? base.lng : null);
-          
-          if (lat && lng) {
-            const marker = new maps.Marker({
-              position: { lat, lng },
-              map: map,
-              title: t.name,
-              icon: getMarkerIcon(t.status)
-            });
-            
-            marker.addListener('click', () => {
-              setSelectedTruck(t);
-            });
-            
-            markersRef.current[t.id || t._id] = marker;
-          }
-        });
-
-        // Fit bounds
-        if (Object.keys(markersRef.current).length > 0) {
-          map.fitBounds(bounds);
-        }
-        
-        setMapLoaded(true);
-      } catch (e) {
-        console.error('Map error:', e);
+  // Initialize Leaflet
+  useEffect(() => {
+    if (!mapRef.current || mapInstanceRef.current) return;
+    try {
+      if (mapRef.current._leaflet_id) {
+        delete mapRef.current._leaflet_id;
       }
-    })();
-  }, [trucks, apiKey]);
+      const map = L.map(mapRef.current, { zoomControl: true }).setView([20.5937, 78.9629], 4);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+      mapInstanceRef.current = map;
+      map.whenReady(() => {
+        setMapLoaded(true);
+        setMapError(null);
+        map.invalidateSize();
+      });
+    } catch (err) {
+      setMapError(err?.message || 'Map failed to initialize.');
+      setMapLoaded(true);
+      return undefined;
+    }
+
+    const handleResize = () => map.invalidateSize();
+    window.addEventListener('resize', handleResize);
+    const timer = setTimeout(() => map.invalidateSize(), 150);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timer);
+      map.remove();
+      mapInstanceRef.current = null;
+    };
+  }, []);
+
+  // Markers
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!mapLoaded || !map) return;
+    const nextIds = new Set();
+    const bounds = L.latLngBounds([]);
+
+    (trucks || []).forEach(t => {
+      const pos = getDisplayLocation(t);
+      if (!pos) return;
+      const id = String(t.id || t._id);
+      nextIds.add(id);
+
+      let marker = markersRef.current[id];
+      if (!marker) {
+        const el = createMarkerEl(t.status);
+        const icon = L.divIcon({
+          className: '',
+          html: el.outerHTML,
+          iconSize: [18, 18],
+          iconAnchor: [9, 18]
+        });
+        marker = L.marker([pos.lat, pos.lng], { icon }).addTo(map);
+        marker.on('click', () => setSelectedTruck(t));
+        markersRef.current[id] = marker;
+      } else {
+        marker.setLatLng([pos.lat, pos.lng]);
+        const markerEl = marker.getElement()?.firstChild || marker.getElement();
+        updateMarkerEl(markerEl, t.status);
+      }
+
+      bounds.extend([pos.lat, pos.lng]);
+    });
+
+    Object.keys(markersRef.current).forEach(id => {
+      if (!nextIds.has(id)) {
+        markersRef.current[id].remove();
+        delete markersRef.current[id];
+      }
+    });
+
+    if (nextIds.size) {
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 14 });
+    }
+  }, [mapLoaded, trucks]);
+
+  // Routes
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!mapLoaded || !map) return;
+
+    stopMarkersRef.current.forEach(m => m.remove());
+    stopMarkersRef.current = [];
+    if (selectedRouteRef.current) {
+      selectedRouteRef.current.remove();
+      selectedRouteRef.current = null;
+    }
+    allRoutesRef.current.forEach(line => line.remove());
+    allRoutesRef.current = [];
+
+    if (selectedTruck?.routePlan?.stops?.length >= 2) {
+      const coords = selectedTruck.routePlan.stops.map(s => [s.lat, s.lng]);
+      const line = L.polyline(coords, { color: '#2563eb', opacity: 0.85, weight: 4 }).addTo(map);
+      selectedRouteRef.current = line;
+
+      selectedTruck.routePlan.stops.forEach((s, idx) => {
+        const el = createStopMarkerEl(idx + 1);
+        const icon = L.divIcon({
+          className: '',
+          html: el.outerHTML,
+          iconSize: [20, 20],
+          iconAnchor: [10, 10]
+        });
+        const marker = L.marker([s.lat, s.lng], { icon, interactive: false }).addTo(map);
+        stopMarkersRef.current.push(marker);
+      });
+
+      map.fitBounds(line.getBounds(), { padding: [60, 60], maxZoom: 15 });
+      return;
+    }
+
+    const lines = [];
+    (trucks || []).forEach(t => {
+      const stops = t?.routePlan?.stops;
+      if (!Array.isArray(stops) || stops.length < 2) return;
+      const coords = stops.map(s => [s.lat, s.lng]);
+      const line = L.polyline(coords, { color: '#94a3b8', opacity: 0.5, weight: 3 }).addTo(map);
+      lines.push(line);
+    });
+
+    allRoutesRef.current = lines;
+    if (lines.length) {
+      const bounds = lines.reduce((b, line) => b.extend(line.getBounds()), L.latLngBounds());
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 12 });
+    }
+  }, [mapLoaded, selectedTruck, trucks]);
 
   // Realtime: subscribe to each truck room for location updates
   useEffect(() => {
@@ -111,15 +302,28 @@ export default function Trucks() {
     const onLoc = ({ truckId, liveLocation }) => {
       setTrucks(list => list.map(t => (t.id === truckId || t._id === truckId) ? { ...t, liveLocation } : t));
       // Update marker position
-      if (markersRef.current[truckId]) {
-        markersRef.current[truckId].setPosition({ lat: liveLocation.lat, lng: liveLocation.lng });
-      }
+      const marker = markersRef.current[String(truckId)];
+      if (marker) marker.setLatLng([liveLocation.lat, liveLocation.lng]);
     };
     sock.on('truck:location', onLoc);
     return () => {
       try { rooms.forEach(room => sock.emit('unsubscribe', { room })); sock.off('truck:location', onLoc); } catch {}
     };
   }, [token, trucks.map(t => t.id || t._id).join(',')]);
+
+  useEffect(() => {
+    if (!mapLoaded) return undefined;
+    const interval = setInterval(() => {
+      trucks.forEach(t => {
+        const id = t.id || t._id;
+        const marker = markersRef.current[id];
+        if (!marker) return;
+        const pos = getDisplayLocation(t);
+        if (pos) marker.setLatLng([pos.lat, pos.lng]);
+      });
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [mapLoaded, trucks]);
 
   if (loading) return <p style={{ padding: 20 }}>Loading trucks...</p>;
   if (error) return <p style={{ color: 'red', padding: 20 }}>{error}</p>;
@@ -181,6 +385,28 @@ export default function Trucks() {
     } catch (e){ setError(e.message); } finally { setUpdating(null); }
   }
 
+  function handleRoutePlanUpdated(truckId, routePlan) {
+    setTrucks(ts => ts.map(t => ((t.id || t._id) === truckId ? { ...t, routePlan } : t)));
+    if (selectedTruck && (selectedTruck.id || selectedTruck._id) === truckId) {
+      setSelectedTruck({ ...selectedTruck, routePlan });
+    }
+  }
+
+  async function applyDefaultRoutePlans() {
+    if (!token || user?.role !== 'admin') return;
+    setRouteDefaultsBusy(true);
+    setError(null);
+    try {
+      await api.applyDefaultRoutePlanDefaults(token);
+      const res = await api.getTrucks();
+      if (res.success) setTrucks(res.data);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setRouteDefaultsBusy(false);
+    }
+  }
+
   return (
     <div style={{ padding: 20, fontFamily: 'system-ui' }}>
       <h2>Food Trucks</h2>
@@ -200,7 +426,19 @@ export default function Trucks() {
 
       {/* Map View */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: 16, height: 'calc(100vh - 200px)', marginBottom: 20 }}>
-        <div ref={mapRef} style={{ background: '#f0f0f0', borderRadius: 8, border: '1px solid #ddd' }}></div>
+        <div style={{ position: 'relative' }}>
+          <div ref={mapRef} style={{ background: '#f0f0f0', borderRadius: 8, border: '1px solid #ddd', width: '100%', height: '100%', minHeight: 420 }}></div>
+          {!mapLoaded && !mapError && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, textAlign: 'center', background: 'rgba(255,255,255,0.7)', color: '#475569', fontSize: 13, borderRadius: 8 }}>
+              Loading map...
+            </div>
+          )}
+          {mapError && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, textAlign: 'center', background: 'rgba(255,255,255,0.8)', color: '#b91c1c', fontSize: 13, borderRadius: 8 }}>
+              {mapError}
+            </div>
+          )}
+        </div>
         
         {/* Truck Details Sidebar */}
         <div style={{ overflowY: 'auto', borderRadius: 8, border: '1px solid #ddd', background: '#fff' }}>
@@ -209,6 +447,8 @@ export default function Trucks() {
               truck={selectedTruck} 
               token={token} 
               user={user}
+              defaultRoutePlan={defaultRoutePlan}
+              onRoutePlanUpdated={handleRoutePlanUpdated}
               onClose={() => setSelectedTruck(null)}
               managers={managers}
               updating={updating}
@@ -230,6 +470,11 @@ export default function Trucks() {
       {token && user.role === 'admin' && (
         <div style={{ marginTop: 20 }}>
           <h3>Admin Panel</h3>
+          <div style={{ marginBottom: 12 }}>
+            <button onClick={applyDefaultRoutePlans} disabled={routeDefaultsBusy}>
+              {routeDefaultsBusy ? 'Applying Default Route...' : 'Apply Default Route to All Trucks'}
+            </button>
+          </div>
           <div style={{ overflowX:'auto' }}>
             <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
@@ -273,7 +518,7 @@ export default function Trucks() {
   );
 }
 
-function TruckDetailCard({ truck, token, user, onClose, managers, updating, setUpdating, handleAssignManager, handleUnassignManager, handleUpdateStatus, handleDeleteTruck }) {
+function TruckDetailCard({ truck, token, user, defaultRoutePlan, onRoutePlanUpdated, onClose, managers, updating, setUpdating, handleAssignManager, handleUnassignManager, handleUpdateStatus, handleDeleteTruck }) {
   const [activeTab, setActiveTab] = useState('info'); // info, menu, order, reserve
   const [menu, setMenu] = useState([]);
   const [cart, setCart] = useState([]);
@@ -282,11 +527,14 @@ function TruckDetailCard({ truck, token, user, onClose, managers, updating, setU
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
   const [currentTruckId, setCurrentTruckId] = useState(truck.id || truck._id);
+  const [routePlanDraft, setRoutePlanDraft] = useState('');
+  const [routePlanSaving, setRoutePlanSaving] = useState(false);
+  const [routePlanError, setRoutePlanError] = useState(null);
+  const [routePlanSuccess, setRoutePlanSuccess] = useState(false);
 
-  const live = truck.liveLocation;
-  const base = truck.location;
-  const lat = typeof live?.lat === 'number' ? live.lat : (typeof base?.lat === 'number' ? base.lat : null);
-  const lng = typeof live?.lng === 'number' ? live.lng : (typeof base?.lng === 'number' ? base.lng : null);
+  const pos = getDisplayLocation(truck);
+  const lat = typeof pos?.lat === 'number' ? pos.lat : null;
+  const lng = typeof pos?.lng === 'number' ? pos.lng : null;
 
   // Reset state when truck changes
   useEffect(() => {
@@ -299,8 +547,17 @@ function TruckDetailCard({ truck, token, user, onClose, managers, updating, setU
       setNotes('');
       setSuccess(false);
       setError(null);
+      setRoutePlanDraft(JSON.stringify(truck.routePlan || defaultRoutePlan, null, 2));
+      setRoutePlanError(null);
+      setRoutePlanSuccess(false);
     }
   }, [truck.id, truck._id, currentTruckId]);
+
+  useEffect(() => {
+    if (!routePlanDraft) {
+      setRoutePlanDraft(JSON.stringify(truck.routePlan || defaultRoutePlan, null, 2));
+    }
+  }, [routePlanDraft, truck.routePlan, defaultRoutePlan]);
 
   // Load menu when switching to menu or order tab
   useEffect(() => {
@@ -319,12 +576,48 @@ function TruckDetailCard({ truck, token, user, onClose, managers, updating, setU
     });
   }
 
-  function updateQty(id, qty) {
+  function updateQty(item, qty) {
+    const itemId = typeof item === 'string' ? item : item._id;
     if (qty <= 0) {
-      setCart(c => c.filter(ci => ci.menuItem !== id));
-    } else {
-      setCart(c => c.map(ci => ci.menuItem === id ? { ...ci, quantity: qty } : ci));
+      setCart(c => c.filter(ci => ci.menuItem !== itemId));
+      return;
     }
+    setCart(c => {
+      const existing = c.find(ci => ci.menuItem === itemId);
+      if (existing) {
+        return c.map(ci => ci.menuItem === itemId ? { ...ci, quantity: qty } : ci);
+      }
+      if (typeof item !== 'string') {
+        return [...c, { menuItem: itemId, name: item.name, quantity: qty, unitPrice: item.price }];
+      }
+      return c;
+    });
+  }
+
+  async function saveRoutePlan() {
+    if (!token || user?.role !== 'admin') return;
+    setRoutePlanSaving(true);
+    setRoutePlanError(null);
+    setRoutePlanSuccess(false);
+    try {
+      const parsed = JSON.parse(routePlanDraft);
+      const res = await api.updateTruckRoutePlan(token, truck.id || truck._id, parsed);
+      if (res.success) {
+        onRoutePlanUpdated(truck.id || truck._id, parsed);
+        setRoutePlanSuccess(true);
+        setTimeout(() => setRoutePlanSuccess(false), 2000);
+      }
+    } catch (e) {
+      setRoutePlanError(e.message || 'Invalid route plan JSON');
+    } finally {
+      setRoutePlanSaving(false);
+    }
+  }
+
+  function applyDefaultRoutePlan() {
+    setRoutePlanDraft(JSON.stringify(defaultRoutePlan, null, 2));
+    setRoutePlanError(null);
+    setRoutePlanSuccess(false);
   }
 
   async function submitOrder(e) {
@@ -406,6 +699,46 @@ function TruckDetailCard({ truck, token, user, onClose, managers, updating, setU
               </div>
             )}
 
+            {truck.routePlan && Array.isArray(truck.routePlan.stops) && truck.routePlan.stops.length > 0 && (
+              <div style={{ marginBottom: 12, padding: 10, border: '1px solid #e5e7eb', borderRadius: 6, background: '#f8fafc' }}>
+                <div style={{ fontSize: 12, color: '#334155', marginBottom: 6 }}>
+                  Route schedule: <strong>{truck.routePlan.dailyStart || '09:00'}-{truck.routePlan.dailyEnd || '11:00'}</strong> ({truck.routePlan.timezone || 'Asia/Kolkata'})
+                </div>
+                <ol style={{ margin: '0 0 0 18px', padding: 0, fontSize: 12, color: '#475569' }}>
+                  {truck.routePlan.stops.map((s, idx) => (
+                    <li key={`${s.name}-${idx}`} style={{ marginBottom: 2 }}>
+                      {s.name} · {s.stayMin || 15} min
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+
+            {token && user?.role === 'admin' && (
+              <div style={{ marginBottom: 12, padding: 10, border: '1px solid #e5e7eb', borderRadius: 6, background: '#fff' }}>
+                <div style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 6 }}>Edit Route Plan (JSON)</div>
+                <textarea
+                  value={routePlanDraft}
+                  onChange={e => setRoutePlanDraft(e.target.value)}
+                  style={{ width: '100%', minHeight: 140, fontSize: 11, padding: 8, borderRadius: 4, border: '1px solid #ddd' }}
+                />
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  <button type="button" onClick={applyDefaultRoutePlan} style={{ fontSize: 11 }}>
+                    Load Default Route
+                  </button>
+                  <button type="button" onClick={saveRoutePlan} disabled={routePlanSaving} style={{ fontSize: 11 }}>
+                    {routePlanSaving ? 'Saving...' : 'Save Route Plan'}
+                  </button>
+                </div>
+                {routePlanSuccess && (
+                  <div style={{ marginTop: 6, fontSize: 11, color: '#065f46' }}>Route plan saved.</div>
+                )}
+                {routePlanError && (
+                  <div style={{ marginTop: 6, fontSize: 11, color: '#b91c1c' }}>{routePlanError}</div>
+                )}
+              </div>
+            )}
+
             {token && user?.role === 'admin' && (
               <div style={{ borderTop: '1px solid #eee', paddingTop: 12 }}>
                 <div style={{ marginBottom: 8 }}>
@@ -459,10 +792,28 @@ function TruckDetailCard({ truck, token, user, onClose, managers, updating, setU
                           <div style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 2 }}>{item.name}</div>
                           <div style={{ fontSize: 13, color: '#16a34a', fontWeight: 'bold' }}>₹{item.price.toFixed(2)}</div>
                         </div>
-                        {token && user?.role === 'customer' && !isSoldOut && (
-                          <button onClick={() => addToCart(item)} style={{ padding: '6px 14px', fontSize: 12, background: inCart ? '#2563eb' : '#16a34a', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                            {inCart ? '+ More' : '+ Add'}
-                          </button>
+                        {token && user?.role === 'customer' && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <button
+                              type="button"
+                              onClick={() => updateQty(item, (inCart?.quantity || 0) - 1)}
+                              disabled={!inCart}
+                              style={{ width: 28, height: 28, borderRadius: 4, border: '1px solid #ddd', background: '#fff', cursor: inCart ? 'pointer' : 'not-allowed', opacity: inCart ? 1 : 0.5 }}
+                            >
+                              -
+                            </button>
+                            <div style={{ minWidth: 20, textAlign: 'center', fontSize: 12, fontWeight: 'bold' }}>
+                              {inCart?.quantity || 0}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => updateQty(item, (inCart?.quantity || 0) + 1)}
+                              disabled={isSoldOut}
+                              style={{ width: 28, height: 28, borderRadius: 4, border: '1px solid #2563eb', background: isSoldOut ? '#cbd5e1' : '#2563eb', color: '#fff', cursor: isSoldOut ? 'not-allowed' : 'pointer', opacity: isSoldOut ? 0.6 : 1 }}
+                            >
+                              +
+                            </button>
+                          </div>
                         )}
                       </div>
                       <div style={{ display: 'flex', gap: 8, fontSize: 11 }}>
@@ -539,9 +890,49 @@ function TruckDetailCard({ truck, token, user, onClose, managers, updating, setU
   );
 }
 
-function getMarkerIcon(status) {
-  const svgMarker = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='${status === 'active' ? '%2316a34a' : '%23ef4444'}' /%3E%3C/svg%3E`;
-  return svgMarker;
+function getMarkerColor(status) {
+  if (status === 'active') return '#16a34a';
+  if (status === 'en_route') return '#2563eb';
+  if (status === 'maintenance') return '#f59e0b';
+  if (status === 'inactive' || status === 'offline') return '#ef4444';
+  return '#64748b';
+}
+
+function createMarkerEl(status) {
+  const el = document.createElement('div');
+  el.style.width = '18px';
+  el.style.height = '18px';
+  el.style.borderRadius = '999px';
+  el.style.background = getMarkerColor(status);
+  el.style.border = '2px solid #ffffff';
+  el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.25)';
+  el.dataset.status = status || '';
+  return el;
+}
+
+function updateMarkerEl(el, status) {
+  if (!el) return;
+  const next = status || '';
+  if (el.dataset.status === next) return;
+  el.dataset.status = next;
+  el.style.background = getMarkerColor(status);
+}
+
+function createStopMarkerEl(label) {
+  const el = document.createElement('div');
+  el.style.width = '20px';
+  el.style.height = '20px';
+  el.style.borderRadius = '999px';
+  el.style.background = '#2563eb';
+  el.style.color = '#ffffff';
+  el.style.fontSize = '10px';
+  el.style.display = 'flex';
+  el.style.alignItems = 'center';
+  el.style.justifyContent = 'center';
+  el.style.border = '2px solid #ffffff';
+  el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.25)';
+  el.textContent = String(label || '');
+  return el;
 }
 
 const th = { textAlign:'left', padding:6, background:'#f5f5f5', fontSize:12 };

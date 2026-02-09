@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 
@@ -91,6 +92,7 @@ export default function AdminTrucks() {
               <th style={th}>Manager</th>
               <th style={th}>Status</th>
               <th style={th}>Active</th>
+              <th style={th}>Route</th>
             </tr>
           </thead>
           <tbody>
@@ -126,10 +128,13 @@ export default function AdminTrucks() {
                     {t.isActive === false ? 'Reactivate' : 'Deactivate'}
                   </button>
                 </td>
+                <td style={td}>
+                  <Link to={`/trucks?truck=${encodeURIComponent(t.id || t._id)}`}>Edit route</Link>
+                </td>
               </tr>
             ))}
             {trucks.length === 0 && (
-              <tr><td style={td} colSpan={4}>No trucks found.</td></tr>
+              <tr><td style={td} colSpan={5}>No trucks found.</td></tr>
             )}
           </tbody>
         </table>

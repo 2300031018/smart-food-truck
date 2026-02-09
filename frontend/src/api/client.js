@@ -56,6 +56,8 @@ export const api = {
   assignStaff: (token, id, userId) => request(`/trucks/${id}/staff`, { method:'POST', body:{ userId }, token }),
   unassignStaff: (token, id, userId) => request(`/trucks/${id}/staff/${userId}`, { method:'DELETE', token }),
   updateTruckStatusLocation: (token, id, payload) => request(`/trucks/${id}/status-location`, { method:'PATCH', body: payload, token }),
+  updateTruckRoutePlan: (token, id, routePlan) => request(`/trucks/${id}/route-plan`, { method:'PATCH', body: { routePlan }, token }),
+  applyDefaultRoutePlanDefaults: (token) => request('/trucks/route-plan-defaults', { method:'PATCH', token }),
   deleteTruck: (token, id) => request(`/trucks/${id}`, { method:'DELETE', token }),
 
   getMenuItems: (truckId, { group } = {}) => {

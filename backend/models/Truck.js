@@ -17,6 +17,19 @@ const TruckSchema = new mongoose.Schema(
       lng: { type: Number, min: -180, max: 180 },
       updatedAt: { type: Date }
     },
+    routePlan: {
+      timezone: { type: String, default: 'Asia/Kolkata' },
+      dailyStart: { type: String, default: '09:00' },
+      dailyEnd: { type: String, default: '11:00' },
+      stops: [
+        {
+          name: { type: String, required: true },
+          lat: { type: Number, min: -90, max: 90, required: true },
+          lng: { type: Number, min: -180, max: 180, required: true },
+          stayMin: { type: Number, min: 1, default: 15 }
+        }
+      ]
+    },
     schedule: [{ area: String, time: String }],
     operatingHours: [
       {

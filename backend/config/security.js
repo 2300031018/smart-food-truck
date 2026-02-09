@@ -3,9 +3,13 @@
 const defaultWhitelist = [
   'http://localhost:5173',
   'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:2999',
   'http://localhost:5174',
   'http://127.0.0.1:5173',
-  'http://127.0.0.1:3000'
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001',
+  'http://127.0.0.1:2999'
 ];
 const allowedOrigins = (process.env.CORS_WHITELIST || defaultWhitelist.join(',')).split(',').map(o => o.trim());
 

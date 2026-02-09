@@ -34,21 +34,19 @@ function PickupPlanner({ order, coords, defaultPrep = 20 }){
   const [etaMin, setEtaMin] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
-  const apiKey = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) || null;
 
-  // Live ETA using Google Distance Matrix when key + my location + coords exist
+  // ETA estimate using local distance calculation
   const live = useLiveEta({
     origin: myPos,
     destination: coords,
-    mode: mode.toUpperCase(),
-    apiKey
+    mode: mode.toUpperCase()
   });
 
-  // Fallback ETA when API key not present or live ETA errored
+  // Fallback ETA when estimate not ready
   useEffect(() => {
     if (!myPos || !coords) { setEtaMin(null); return; }
-    // Prefer live ETA when ok
-    if (apiKey && live.status === 'ok' && typeof live.minutes === 'number') {
+    // Prefer estimate when ok
+    if (live.status === 'ok' && typeof live.minutes === 'number') {
       setEtaMin(live.minutes);
       return;
     }
@@ -78,7 +76,9 @@ function PickupPlanner({ order, coords, defaultPrep = 20 }){
 
   const mapsUrl = (() => {
     if (!myPos || !coords) return null;
-    return `https://www.google.com/maps/dir/${encodeURIComponent(myPos.lat + ',' + myPos.lng)}/${encodeURIComponent(coords.lat + ',' + coords.lng)}`;
+    const origin = `${myPos.lat},${myPos.lng}`;
+    const dest = `${coords.lat},${coords.lng}`;
+    return `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${encodeURIComponent(origin)}%3B${encodeURIComponent(dest)}`;
   })();
 
   if (!coords) return null;
@@ -108,9 +108,6 @@ function PickupPlanner({ order, coords, defaultPrep = 20 }){
               <>
                 <span>
                   ETA to truck: <strong>{etaMin} min</strong>
-                  {apiKey && live.status === 'ok' && <span style={{ marginLeft:6, fontSize:11, color:'#059669' }}>(live)</span>}
-                  {apiKey && live.status === 'loading' && <span style={{ marginLeft:6, fontSize:11, color:'#6b7280' }}>(checking live)</span>}
-                  {apiKey && live.status === 'error' && <span style={{ marginLeft:6, fontSize:11, color:'#b45309' }}>(fallback)</span>}
                 </span>
                 {suggestion && <span>· {suggestion}</span>}
               </>
@@ -119,7 +116,7 @@ function PickupPlanner({ order, coords, defaultPrep = 20 }){
             )}
           </div>
           {mapsUrl && (
-            <a href={mapsUrl} target="_blank" rel="noreferrer" style={{ fontSize:12 }}>Open route in Google Maps</a>
+            <a href={mapsUrl} target="_blank" rel="noreferrer" style={{ fontSize:12 }}>Open route in OpenStreetMap</a>
           )}
           {err && <div style={{ color:'#b91c1c', fontSize:12 }}>{err}</div>}
         </div>

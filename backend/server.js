@@ -53,6 +53,8 @@ app.use(errorHandler);
 const server = http.createServer(app);
 const { initSocket } = require('./socket');
 initSocket(server);
+const { startTruckAutoUpdate } = require('./utils/truckRouteSimulator');
+startTruckAutoUpdate();
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

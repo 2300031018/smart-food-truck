@@ -16,6 +16,8 @@ const {
   getTruckStaff,
   assignStaff,
   unassignStaff,
+  applyDefaultRoutePlanDefaults,
+  updateRoutePlan,
   updateStatusLocation
 } = require('../controllers/truckController');
 
@@ -24,6 +26,7 @@ router.route('/')
   .post(auth, authorize('admin', 'manager'), createTruck);
 
 router.get('/managed', auth, authorize('admin','manager'), getManagedTrucks);
+router.patch('/route-plan-defaults', auth, authorize('admin'), applyDefaultRoutePlanDefaults);
 
 router.route('/:id')
   .get(getTruck)
@@ -37,6 +40,7 @@ router.patch('/:id/unassign-manager', auth, authorize('admin'), unassignManager)
 router.get('/:id/staff', auth, authorize('admin','manager'), getTruckStaff);
 router.post('/:id/staff', auth, authorize('admin','manager'), assignStaff);
 router.delete('/:id/staff/:userId', auth, authorize('admin','manager'), unassignStaff);
+router.patch('/:id/route-plan', auth, authorize('admin','manager'), updateRoutePlan);
 router.patch('/:id/status-location', auth, authorize('admin','manager'), updateStatusLocation);
 
 module.exports = router;
