@@ -164,11 +164,12 @@ export default function Trucks() {
   // Initialize Leaflet
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
+    let map;
     try {
       if (mapRef.current._leaflet_id) {
         delete mapRef.current._leaflet_id;
       }
-      const map = L.map(mapRef.current, { zoomControl: true }).setView([20.5937, 78.9629], 4);
+      map = L.map(mapRef.current, { zoomControl: true }).setView([20.5937, 78.9629], 4);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
       }).addTo(map);
@@ -184,13 +185,15 @@ export default function Trucks() {
       return undefined;
     }
 
-    const handleResize = () => map.invalidateSize();
+    const handleResize = () => map?.invalidateSize();
     window.addEventListener('resize', handleResize);
-    const timer = setTimeout(() => map.invalidateSize(), 150);
+    const timer = setTimeout(() => map?.invalidateSize(), 150);
     return () => {
       window.removeEventListener('resize', handleResize);
       clearTimeout(timer);
-      map.remove();
+      if (map) {
+        map.remove();
+      }
       mapInstanceRef.current = null;
     };
   }, []);
@@ -325,9 +328,6 @@ export default function Trucks() {
     return () => clearInterval(interval);
   }, [mapLoaded, trucks]);
 
-  if (loading) return <p style={{ padding: 20 }}>Loading trucks...</p>;
-  if (error) return <p style={{ color: 'red', padding: 20 }}>{error}</p>;
-
   async function submitTruck(e){
     e.preventDefault();
     setCreating(true); setError(null);
@@ -410,6 +410,8 @@ export default function Trucks() {
   return (
     <div style={{ padding: 20, fontFamily: 'system-ui' }}>
       <h2>Food Trucks</h2>
+      {loading && <p style={{ padding: '6px 0', color: '#475569' }}>Loading trucks...</p>}
+      {error && <p style={{ color: 'red', padding: '6px 0' }}>{error}</p>}
       {token && ['admin','manager'].includes(user.role) && (
         <form onSubmit={submitTruck} style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:20 }}>
           <input placeholder="Name" value={newTruck.name} onChange={e=> setNewTruck(nt => ({ ...nt, name:e.target.value }))} required />
