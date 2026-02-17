@@ -18,7 +18,11 @@ const {
   unassignStaff,
   applyDefaultRoutePlanDefaults,
   updateRoutePlan,
-  updateStatusLocation
+  updateStatusLocation,
+  startRoute,
+  advanceRoute,
+  stopRoute,
+  forceAllServing
 } = require('../controllers/truckController');
 
 router.route('/')
@@ -42,5 +46,9 @@ router.post('/:id/staff', auth, authorize('admin','manager'), assignStaff);
 router.delete('/:id/staff/:userId', auth, authorize('admin','manager'), unassignStaff);
 router.patch('/:id/route-plan', auth, authorize('admin','manager'), updateRoutePlan);
 router.patch('/:id/status-location', auth, authorize('admin','manager'), updateStatusLocation);
+router.post('/:id/start-route', auth, authorize('admin','manager'), startRoute);
+router.post('/:id/advance-route', auth, authorize('admin','manager'), advanceRoute);
+router.post('/:id/stop-route', auth, authorize('admin','manager'), stopRoute);
+router.patch('/force-serving', auth, authorize('admin'), forceAllServing);
 
 module.exports = router;

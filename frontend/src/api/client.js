@@ -50,15 +50,18 @@ export const api = {
   deactivateTruck: (token, id) => request(`/trucks/${id}/deactivate`, { method: 'PATCH', token }),
   reactivateTruck: (token, id) => request(`/trucks/${id}/reactivate`, { method: 'PATCH', token }),
   getManagedTrucks: (token) => request('/trucks/managed', { token }),
-  assignManager: (token, id, managerId) => request(`/trucks/${id}/assign-manager`, { method:'PATCH', body:{ managerId }, token }),
-  unassignManager: (token, id) => request(`/trucks/${id}/unassign-manager`, { method:'PATCH', token }),
+  assignManager: (token, id, managerId) => request(`/trucks/${id}/assign-manager`, { method: 'PATCH', body: { managerId }, token }),
+  unassignManager: (token, id) => request(`/trucks/${id}/unassign-manager`, { method: 'PATCH', token }),
   getTruckStaff: (token, id) => request(`/trucks/${id}/staff`, { token }),
-  assignStaff: (token, id, userId) => request(`/trucks/${id}/staff`, { method:'POST', body:{ userId }, token }),
-  unassignStaff: (token, id, userId) => request(`/trucks/${id}/staff/${userId}`, { method:'DELETE', token }),
-  updateTruckStatusLocation: (token, id, payload) => request(`/trucks/${id}/status-location`, { method:'PATCH', body: payload, token }),
-  updateTruckRoutePlan: (token, id, routePlan) => request(`/trucks/${id}/route-plan`, { method:'PATCH', body: { routePlan }, token }),
-  applyDefaultRoutePlanDefaults: (token) => request('/trucks/route-plan-defaults', { method:'PATCH', token }),
-  deleteTruck: (token, id) => request(`/trucks/${id}`, { method:'DELETE', token }),
+  assignStaff: (token, id, userId) => request(`/trucks/${id}/staff`, { method: 'POST', body: { userId }, token }),
+  unassignStaff: (token, id, userId) => request(`/trucks/${id}/staff/${userId}`, { method: 'DELETE', token }),
+  updateTruckStatusLocation: (token, id, payload) => request(`/trucks/${id}/status-location`, { method: 'PATCH', body: payload, token }),
+  updateTruckRoutePlan: (token, id, routePlan) => request(`/trucks/${id}/route-plan`, { method: 'PATCH', body: { routePlan }, token }),
+  applyDefaultRoutePlanDefaults: (token) => request('/trucks/route-plan-defaults', { method: 'PATCH', token }),
+  startTruckRoute: (token, id) => request(`/trucks/${id}/start-route`, { method: 'POST', token }),
+  advanceTruckRoute: (token, id) => request(`/trucks/${id}/advance-route`, { method: 'POST', token }),
+  stopTruckRoute: (token, id) => request(`/trucks/${id}/stop-route`, { method: 'POST', token }),
+  deleteTruck: (token, id) => request(`/trucks/${id}`, { method: 'DELETE', token }),
 
   getMenuItems: (truckId, { group } = {}) => {
     const qs = group ? `?group=${encodeURIComponent(group)}` : '';
@@ -75,17 +78,9 @@ export const api = {
   getOrder: (token, id) => request(`/orders/${id}`, { token }),
   updateOrderStatus: (token, id, status) => request(`/orders/${id}/status`, { method: 'PATCH', body: { status }, token }),
 
-  createReservation: (token, payload) => request('/reservations', { method: 'POST', body: payload, token }),
-  getReservations: (token, params={}) => {
-    const query = new URLSearchParams(params).toString();
-    return request(`/reservations${query ? `?${query}`:''}`, { token });
-  },
-  updateReservationStatus: (token, id, status) => request(`/reservations/${id}/status`, { method: 'PATCH', body: { status }, token }),
-  cancelReservation: (token, id) => request(`/reservations/${id}/cancel`, { method: 'PATCH', token }),
-
   // User creation (hierarchical)
   createManager: (token, payload) => request('/users/managers', { method: 'POST', body: payload, token }),
-  getManagers: (token, { includeInactive=false } = {}) => request(`/users/managers${includeInactive ? '?includeInactive=true' : ''}`, { token }),
+  getManagers: (token, { includeInactive = false } = {}) => request(`/users/managers${includeInactive ? '?includeInactive=true' : ''}`, { token }),
   getManagersOverview: (token) => request('/users/managers/overview', { token }),
   deleteManager: (token, id) => request(`/users/managers/${id}`, { method: 'DELETE', token }),
   reactivateManager: (token, id) => request(`/users/managers/${id}/reactivate`, { method: 'PATCH', token }),

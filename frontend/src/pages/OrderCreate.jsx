@@ -26,6 +26,10 @@ export default function OrderCreate(){
     }
   }, [truckId]);
 
+  const selectedTruck = trucks.find(t => String(t.id || t._id) === String(truckId));
+  const truckStatus = String(selectedTruck?.status || '').trim().toUpperCase();
+  const canOrder = truckStatus === 'SERVING';
+
   function addToCart(item){
     setCart(c => {
       const existing = c.find(ci => ci.menuItem === item._id);
@@ -46,6 +50,9 @@ export default function OrderCreate(){
     e.preventDefault();
     setSubmitting(true); setError(null); setSuccess(null);
     try {
+      if (!canOrder) {
+        throw new Error('Truck is not accepting orders right now.');
+      }
       const payload = { truck: truckId, items: cart.map(c => ({ menuItem: c.menuItem, quantity: c.quantity })), notes };
       const res = await api.createOrder(token, payload);
       if (res.success){
@@ -68,13 +75,18 @@ export default function OrderCreate(){
           <div style={{ display:'flex', gap:24 }}>
             <div style={{ flex:1 }}>
               <h4>Menu</h4>
+              {!canOrder && (
+                <div style={{ marginBottom: 8, padding: 8, borderRadius: 6, background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', fontSize: 12 }}>
+                  Ordering is disabled for this truck (status: {truckStatus || '—'}).
+                </div>
+              )}
               <ul style={{ listStyle:'none', padding:0 }}>
                 {menu.length === 0 && (
                   <li style={{ opacity:.7, fontSize:12 }}>No items available for this truck.</li>
                 )}
                 {menu.map(mi => (
                   <li key={mi._id} style={{ marginBottom:4 }}>
-                    {mi.name} {formatCurrency(mi.price)} <button type="button" onClick={()=> addToCart(mi)}>Add</button>
+                    {mi.name} {formatCurrency(mi.price)} <button type="button" onClick={()=> addToCart(mi)} disabled={!canOrder}>Add</button>
                   </li>
                 ))}
               </ul>
@@ -94,7 +106,7 @@ export default function OrderCreate(){
           </div>
         )}
         <textarea placeholder="Notes (optional)" value={notes} onChange={e=> setNotes(e.target.value)} />
-        <button disabled={submitting || cart.length===0}>{submitting ? 'Submitting...' : 'Submit Order'}</button>
+        <button disabled={submitting || cart.length===0 || !canOrder}>{submitting ? 'Submitting...' : 'Submit Order'}</button>
         {error && <div style={{ color:'red' }}>{error}</div>}
         {success && (
           <div style={{ background:'#ecfdf5', border:'1px solid #a7f3d0', color:'#065f46', padding:'10px', borderRadius:6 }}>

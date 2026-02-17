@@ -69,7 +69,6 @@ exports.createStaff = asyncHandler(async (req, res) => {
   } });
 });
 
-// Admin updates staff (name, email, password, staffRole)
 exports.updateStaff = asyncHandler(async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ success:false, error:{ message:'Forbidden' } });
   const { name, email, password, staffRole } = req.body || {};

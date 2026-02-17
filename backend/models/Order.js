@@ -19,15 +19,17 @@ const OrderSchema = new mongoose.Schema(
     truck: { type: mongoose.Schema.Types.ObjectId, ref: 'Truck', required: true, index: true },
     staff: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // assigned/claiming staff
     items: { type: [OrderItemSchema], validate: v => v.length > 0 },
-    status: { type: String, enum: ['pending', 'accepted', 'preparing', 'ready', 'delivered', 'completed', 'cancelled'], default: 'pending', index: true },
+    status: { type: String, enum: ['PLACED', 'ACCEPTED', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED', 'pending', 'accepted', 'preparing', 'ready', 'delivered', 'completed', 'cancelled'], default: 'PLACED', index: true },
     total: { type: Number, required: true, min: 0 },
     paymentStatus: { type: String, enum: ['unpaid', 'paid', 'refunded'], default: 'unpaid' },
-  notes: { type: String },
-  placedAt: { type: Date, default: Date.now, index: true },
-  readyAt: { type: Date },
-  deliveredAt: { type: Date },
-  cancelledAt: { type: Date },
-  cancelReason: { type: String }
+    pickupStopId: { type: String },
+    notes: { type: String },
+    placedAt: { type: Date, default: Date.now, index: true },
+    readyAt: { type: Date },
+    completedAt: { type: Date },
+    deliveredAt: { type: Date },
+    cancelledAt: { type: Date },
+    cancelReason: { type: String }
   },
   { timestamps: true }
 );

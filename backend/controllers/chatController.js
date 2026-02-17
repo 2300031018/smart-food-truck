@@ -50,13 +50,6 @@ exports.getTruckRoom = asyncHandler(async (req, res) => {
   res.json({ success:true, data:{ id: room.id, type: 'truck', truck: truckId } });
 });
 
-exports.getSupportRoom = asyncHandler(async (req, res) => {
-  // One support room per user
-  let room = await ChatRoom.findOne({ type: 'support', createdBy: req.user.id });
-  if (!room) room = await ChatRoom.create({ type: 'support', createdBy: req.user.id, participants: [req.user.id] });
-  res.json({ success:true, data:{ id: room.id, type: 'support' } });
-});
-
 exports.listMessages = asyncHandler(async (req, res) => {
   const { roomId } = req.params;
   const room = await ChatRoom.findById(roomId);
@@ -91,3 +84,4 @@ exports.postMessage = asyncHandler(async (req, res) => {
   try { emitChatMessage(room.id || room._id, msg); } catch {}
   res.status(201).json({ success:true, data: msg });
 });
+

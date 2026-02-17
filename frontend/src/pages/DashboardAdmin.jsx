@@ -33,7 +33,6 @@ export default function DashboardAdmin(){
         <Link to="/admin/managers" style={navLink}>Managers</Link>
         <Link to="/admin/staff" style={navLink}>Staff</Link>
         <Link to="/admin/orders" style={navLink}>Orders</Link>
-        <Link to="/admin/reservations" style={navLink}>Reservations</Link>
       </nav>
       <p style={{ color:'#555', marginTop:12 }}>
         Choose a truck to manage its menu (add items and mark Available/Unavailable).

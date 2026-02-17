@@ -38,7 +38,6 @@ app.use('/api/menu', require('./routes/menu'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/chats', require('./routes/chats'));
-app.use('/api/reservations', require('./routes/reservations'));
 app.use('/api/health', require('./routes/health'));
 
 // Not found handler

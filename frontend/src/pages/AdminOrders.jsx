@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
+import { useSocketRooms } from '../hooks/useSocketRooms';
 
 export default function AdminOrders() {
   const { token, user } = useAuth();
@@ -37,6 +38,40 @@ export default function AdminOrders() {
   }
 
   useEffect(() => { load(); }, [token, user]);
+
+  const upsertOrder = useCallback((incoming) => {
+    if (!incoming) return;
+    const id = incoming._id || incoming.id;
+    if (!id) return;
+    setOrders(list => {
+      const idx = list.findIndex(o => (o._id || o.id) === id);
+      if (idx === -1) return [incoming, ...list];
+      const next = list.slice();
+      next[idx] = { ...next[idx], ...incoming };
+      return next;
+    });
+  }, []);
+
+  const handleOrderNew = useCallback(({ order }) => {
+    upsertOrder(order);
+  }, [upsertOrder]);
+
+  const handleOrderUpdate = useCallback(({ orderId, order, status }) => {
+    if (order) {
+      upsertOrder(order);
+      return;
+    }
+    if (!orderId) return;
+    setOrders(list => list.map(o => (o._id || o.id) === orderId ? { ...o, status } : o));
+  }, [upsertOrder]);
+
+  const rooms = useMemo(() => (user?.role === 'admin' ? ['orders:admin'] : []), [user?.role]);
+  const listeners = useMemo(() => ({
+    'order:new': handleOrderNew,
+    'order:update': handleOrderUpdate
+  }), [handleOrderNew, handleOrderUpdate]);
+
+  useSocketRooms({ token, rooms, listeners, enabled: Boolean(token && user?.role === 'admin') });
 
   if (!token) return <p style={{ padding:20 }}>Unauthorized</p>;
   if (user?.role !== 'admin') return <p style={{ padding:20 }}>Forbidden</p>;

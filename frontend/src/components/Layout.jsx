@@ -1,13 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import ChatDrawer from './ChatDrawer';
-import { chatApi } from '../api/chat';
 
 export default function Layout({ children }) {
   const { token, user, logout } = useAuth();
   const navigate = useNavigate();
-  const [supportOpen, setSupportOpen] = useState(false);
 
   function handleLogout() {
     logout();
@@ -30,8 +27,7 @@ export default function Layout({ children }) {
       { to: '/manager', label: 'Manager Dashboard' },
       { to: '/manager/staff', label: 'My Staff' },
       { to: '/trucks', label: 'My Trucks' },
-      { to: '/orders', label: 'Orders' },
-      { to: '/reservations', label: 'Reservations' }
+      { to: '/orders', label: 'Orders' }
     );
   } else if (role === 'staff') {
     // Staff — Execution
@@ -46,9 +42,7 @@ export default function Layout({ children }) {
       { to: '/customer', label: 'Dashboard' },
       { to: '/trucks', label: 'Find Trucks' },
       { to: '/orders/new', label: 'New Order' },
-      { to: '/orders', label: 'My Orders' },
-      { to: '/reservations/new', label: 'Book Truck' },
-      { to: '/reservations', label: 'Reservations' }
+      { to: '/orders', label: 'My Orders' }
     );
   }
 
@@ -74,20 +68,6 @@ export default function Layout({ children }) {
         </div>
       </nav>
       <main style={{ flex: 1 }}>{children}</main>
-      {token && (
-        <>
-          <button onClick={() => setSupportOpen(true)}
-            style={{ position:'fixed', right:16, bottom:20, background:'#2563eb', color:'#fff', border:'none', borderRadius:22, padding:'10px 14px', cursor:'pointer', boxShadow:'0 6px 18px rgba(37,99,235,0.35)', zIndex:9998 }}>
-            Support
-          </button>
-          <ChatDrawer
-            open={supportOpen}
-            onClose={()=> setSupportOpen(false)}
-            title="Support Chat"
-            roomResolver={(tok)=> chatApi.getSupportRoom(tok)}
-          />
-        </>
-      )}
       <footer style={{ textAlign: 'center', padding: 20, fontSize: 12, color: '#666' }}>
         &copy; {new Date().getFullYear()} Smart Food Truck
       </footer>

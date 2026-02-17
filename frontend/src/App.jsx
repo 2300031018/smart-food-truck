@@ -5,9 +5,7 @@ import Trucks from './pages/Trucks';
 import TruckDetail from './pages/TruckDetail';
 import MenuManage from './pages/MenuManage';
 import OrderCreate from './pages/OrderCreate';
-import ReservationCreate from './pages/ReservationCreate';
 import Orders from './pages/Orders';
-import Reservations from './pages/Reservations';
 import Layout from './components/Layout';
 import RoleRoute from './components/RoleRoute';
 import DashboardAdmin from './pages/DashboardAdmin';
@@ -15,7 +13,6 @@ import AdminManagers from './pages/AdminManagers';
 import AdminStaff from './pages/AdminStaff';
 import AdminTrucks from './pages/AdminTrucks';
 import AdminOrders from './pages/AdminOrders';
-import AdminReservations from './pages/AdminReservations';
 import DashboardManager from './pages/DashboardManager';
 import ManagerStaff from './pages/ManagerStaff';
 import DashboardStaff from './pages/DashboardStaff';
@@ -57,7 +54,6 @@ export default function App() {
           <Route path="/admin/managers" element={<RoleRoute roles={['admin']}><AdminManagers /></RoleRoute>} />
           <Route path="/admin/staff" element={<RoleRoute roles={['admin']}><AdminStaff /></RoleRoute>} />
           <Route path="/admin/orders" element={<RoleRoute roles={['admin']}><AdminOrders /></RoleRoute>} />
-          <Route path="/admin/reservations" element={<RoleRoute roles={['admin']}><AdminReservations /></RoleRoute>} />
           <Route path="/manager" element={<RoleRoute roles={['manager']}><DashboardManager /></RoleRoute>} />
           <Route path="/manager/staff" element={<RoleRoute roles={['manager']}><ManagerStaff /></RoleRoute>} />
           <Route path="/staff/stock" element={<RoleRoute roles={['staff']}><StaffStock /></RoleRoute>} />
@@ -65,8 +61,6 @@ export default function App() {
           <Route path="/customer" element={<RoleRoute roles={['customer']}><DashboardCustomer /></RoleRoute>} />
           <Route path="/orders" element={<Protected><Orders /></Protected>} />
           <Route path="/orders/new" element={<Protected><OrderCreate /></Protected>} />
-          <Route path="/reservations" element={<Protected><Reservations /></Protected>} />
-          <Route path="/reservations/new" element={<Protected><ReservationCreate /></Protected>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

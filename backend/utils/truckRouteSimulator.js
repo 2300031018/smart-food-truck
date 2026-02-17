@@ -17,13 +17,15 @@ function minutesInTimeZone(date, timeZone) {
     const parts = new Intl.DateTimeFormat('en-IN', {
       hour: '2-digit',
       minute: '2-digit',
+      second: '2-digit',
       hour12: false,
       timeZone
     }).formatToParts(date);
     const hour = Number(parts.find(p => p.type === 'hour')?.value);
     const minute = Number(parts.find(p => p.type === 'minute')?.value);
-    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
-    return hour * 60 + minute;
+    const second = Number(parts.find(p => p.type === 'second')?.value);
+    if (!Number.isFinite(hour) || !Number.isFinite(minute) || !Number.isFinite(second)) return null;
+    return hour * 60 + minute + (second / 60);
   } catch {
     return null;
   }
@@ -47,7 +49,7 @@ function normalizeStops(routePlan) {
       name: String(s?.name || '').trim(),
       lat: Number(s?.lat),
       lng: Number(s?.lng),
-      stayMin: Math.max(1, Number(s?.stayMin || 15))
+      stayMin: Math.max(0, Number.isFinite(Number(s?.stayMin)) ? Number(s.stayMin) : 15)
     }))
     .filter(s => s.name && Number.isFinite(s.lat) && Number.isFinite(s.lng));
 }
@@ -57,7 +59,7 @@ function ensureLoopStops(stops) {
   const first = stops[0];
   const last = stops[stops.length - 1];
   const same = Math.abs(first.lat - last.lat) < 1e-6 && Math.abs(first.lng - last.lng) < 1e-6;
-  return same ? stops : [...stops, { ...first, stayMin: Math.max(1, Number(first.stayMin || 15)) }];
+  return same ? stops : [...stops, { ...first, stayMin: Math.max(0, Number.isFinite(Number(first.stayMin)) ? Number(first.stayMin) : 15) }];
 }
 
 function computePlannedLocation(routePlan, now = new Date()) {
@@ -68,22 +70,28 @@ function computePlannedLocation(routePlan, now = new Date()) {
   const nowMin = minutesInTimeZone(now, tz);
   const startMin = parseHHMM(routePlan?.dailyStart || '09:00');
   const endMin = parseHHMM(routePlan?.dailyEnd || '11:00');
-  if (nowMin === null || startMin === null || endMin === null) return stops[0];
+  if (nowMin === null || startMin === null || endMin === null) {
+    return { lat: stops[0].lat, lng: stops[0].lng, status: 'SERVING', currentStopIndex: 0 };
+  }
 
-  if (nowMin < startMin || nowMin > endMin) return stops[0];
+  if (nowMin < startMin || nowMin > endMin) {
+    return { lat: stops[0].lat, lng: stops[0].lng, status: 'SERVING', currentStopIndex: 0 };
+  }
 
   const segments = [];
   for (let i = 0; i < stops.length - 1; i += 1) {
     const a = stops[i];
     const b = stops[i + 1];
-    segments.push({ type: 'stay', stop: a, duration: Math.max(1, Number(a.stayMin || 15)) });
+    segments.push({ type: 'stay', stop: a, stopIndex: i, duration: Math.max(0, Number(a.stayMin ?? 15)) });
     const distanceKm = haversineMeters(a.lat, a.lng, b.lat, b.lng) / 1000;
-    const travelMin = Math.max(1, Math.round((distanceKm / SPEED_KMH) * 60));
-    segments.push({ type: 'travel', from: a, to: b, duration: travelMin });
+    const travelMin = Math.max(0.1, (distanceKm / SPEED_KMH) * 60);
+    segments.push({ type: 'travel', from: a, to: b, fromIndex: i, toIndex: i + 1, duration: travelMin });
   }
 
   const totalDuration = segments.reduce((sum, s) => sum + s.duration, 0);
-  if (totalDuration <= 0) return stops[0];
+  if (totalDuration <= 0) {
+    return { lat: stops[0].lat, lng: stops[0].lng, status: 'SERVING', currentStopIndex: 0 };
+  }
 
   const windowMin = Math.max(1, endMin - startMin);
   let elapsed = (nowMin - startMin) % windowMin;
@@ -91,17 +99,21 @@ function computePlannedLocation(routePlan, now = new Date()) {
 
   for (const seg of segments) {
     if (elapsed <= seg.duration) {
-      if (seg.type === 'stay') return { lat: seg.stop.lat, lng: seg.stop.lng };
+      if (seg.type === 'stay') {
+        return { lat: seg.stop.lat, lng: seg.stop.lng, status: 'SERVING', currentStopIndex: seg.stopIndex };
+      }
       const t = seg.duration === 0 ? 0 : (elapsed / seg.duration);
       return {
         lat: seg.from.lat + (seg.to.lat - seg.from.lat) * t,
-        lng: seg.from.lng + (seg.to.lng - seg.from.lng) * t
+        lng: seg.from.lng + (seg.to.lng - seg.from.lng) * t,
+        status: 'MOVING',
+        currentStopIndex: seg.toIndex
       };
     }
     elapsed -= seg.duration;
   }
 
-  return { lat: stops[0].lat, lng: stops[0].lng };
+  return { lat: stops[0].lat, lng: stops[0].lng, status: 'SERVING', currentStopIndex: 0 };
 }
 
 async function updateTruckLocations() {
@@ -110,7 +122,7 @@ async function updateTruckLocations() {
     isActive: true,
     status: { $in: ['active', 'en_route'] },
     'routePlan.stops.0': { $exists: true }
-  }).select('routePlan liveLocation');
+  }).select('routePlan liveLocation status currentStopIndex');
 
   for (const truck of trucks) {
     const pos = computePlannedLocation(truck.routePlan, now);
@@ -123,11 +135,15 @@ async function updateTruckLocations() {
       ? haversineMeters(prevLat, prevLng, pos.lat, pos.lng)
       : Infinity;
 
-    if (moved < MIN_MOVE_METERS) continue;
+    const statusChanged = truck.status !== pos.status;
+    const stopChanged = truck.currentStopIndex !== pos.currentStopIndex;
+    if (moved < MIN_MOVE_METERS && !statusChanged && !stopChanged) continue;
 
     truck.liveLocation = { lat: pos.lat, lng: pos.lng, updatedAt: now };
+    truck.status = pos.status;
+    truck.currentStopIndex = pos.currentStopIndex;
     await truck.save();
-    try { emitTruckLocation(truck.id, truck.liveLocation); } catch {}
+    try { emitTruckLocation(truck.id, truck.liveLocation, truck.status, truck.currentStopIndex); } catch { }
   }
 }
 

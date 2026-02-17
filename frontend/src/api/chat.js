@@ -20,7 +20,6 @@ async function post(url, body, token){
 export const chatApi = {
   getOrderRoom: (token, orderId) => get(`/chats/order/${orderId}/room`, token),
   getTruckRoom: (token, truckId) => get(`/chats/truck/${truckId}/room`, token),
-  getSupportRoom: (token) => get(`/chats/support/room`, token),
   listMessages: (token, roomId) => get(`/chats/rooms/${roomId}/messages`, token),
   postMessage: (token, roomId, text) => post(`/chats/rooms/${roomId}/messages`, { text }, token)
 };

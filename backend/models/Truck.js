@@ -17,7 +17,12 @@ const TruckSchema = new mongoose.Schema(
       lng: { type: Number, min: -180, max: 180 },
       updatedAt: { type: Date }
     },
+    currentLocation: {
+      lat: { type: Number, min: -90, max: 90 },
+      lng: { type: Number, min: -180, max: 180 }
+    },
     routePlan: {
+      name: { type: String, trim: true },
       timezone: { type: String, default: 'Asia/Kolkata' },
       dailyStart: { type: String, default: '09:00' },
       dailyEnd: { type: String, default: '11:00' },
@@ -26,7 +31,8 @@ const TruckSchema = new mongoose.Schema(
           name: { type: String, required: true },
           lat: { type: Number, min: -90, max: 90, required: true },
           lng: { type: Number, min: -180, max: 180, required: true },
-          stayMin: { type: Number, min: 1, default: 15 }
+          waitTime: { type: Number, min: 0, default: 15 },
+          stayMin: { type: Number, min: 0 }
         }
       ]
     },
@@ -39,8 +45,9 @@ const TruckSchema = new mongoose.Schema(
       }
     ],
     capacity: { type: Number, min: 0 },
-    status: { type: String, enum: ['active', 'inactive', 'en_route', 'offline', 'maintenance'], default: 'active', index: true },
+    status: { type: String, enum: ['OPEN', 'PREPARING', 'SERVING', 'SOLD_OUT', 'CLOSED', 'MOVING'], default: 'OPEN', index: true },
     isActive: { type: Boolean, default: true },
+    currentStopIndex: { type: Number, min: 0, default: 0 },
     manager: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
     staff: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
   },

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatCurrency } from '../utils/currency';
 import { useParams } from 'react-router-dom';
 import { api } from '../api/client';
@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { chatApi } from '../api/chat';
 import ChatDrawer from '../components/ChatDrawer';
 import MapEmbed from '../components/MapEmbed';
-import { getSocket } from '../realtime/socket';
+import { useSocketRooms } from '../hooks/useSocketRooms';
 
 export default function TruckDetail() {
   const { id } = useParams();
@@ -19,7 +19,7 @@ export default function TruckDetail() {
   const [locBusy, setLocBusy] = useState(false);
   const [locError, setLocError] = useState(null);
   const [autoUpdate, setAutoUpdate] = useState(false);
-  const [locForm, setLocForm] = useState({ lat:'', lng:'' });
+  const [locForm, setLocForm] = useState({ lat: '', lng: '' });
   const watchIdRef = useRef(null);
 
   useEffect(() => {
@@ -37,19 +37,22 @@ export default function TruckDetail() {
 
     return () => { mounted = false; };
   }, [id]);
-  useEffect(() => {
-    if (!token) return;
-    const sock = getSocket(token);
-    const room = `truck:${id}`;
-    const onLoc = (payload) => {
-      if (payload?.truckId === (truck?.id || truck?._id || id)) {
-        setTruck(t => ({ ...(t||{}), liveLocation: payload.liveLocation }));
-      }
-    };
-    sock.emit('subscribe', { room });
-    sock.on('truck:location', onLoc);
-    return () => { try { sock.emit('unsubscribe', { room }); sock.off('truck:location', onLoc); } catch {} };
-  }, [id, token, truck?.id, truck?._id]);
+  const rooms = useMemo(() => (id ? [`truck:${id}`] : []), [id]);
+  const handleLocation = useCallback((payload) => {
+    if (!payload?.truckId) return;
+    setTruck(prev => {
+      const currentId = prev?.id || prev?._id || id;
+      if (payload.truckId !== currentId) return prev;
+      return {
+        ...(prev || {}),
+        liveLocation: payload.liveLocation,
+        status: payload.status ?? prev?.status,
+        currentStopIndex: Number.isFinite(payload.currentStopIndex) ? payload.currentStopIndex : prev?.currentStopIndex
+      };
+    });
+  }, [id]);
+  const listeners = useMemo(() => ({ 'truck:location': handleLocation }), [handleLocation]);
+  useSocketRooms({ token, rooms, listeners, enabled: Boolean(token && id) });
 
   useEffect(() => {
     return () => {
@@ -69,31 +72,31 @@ export default function TruckDetail() {
   if (error) return <p style={{ padding: 20, color: 'red' }}>{error}</p>;
   if (!truck) return <p style={{ padding: 20 }}>Truck not found.</p>;
 
-  const isManagerOfTruck = token && user?.role==='manager' && truck?.manager && (truck.manager.id===user.id || truck.manager.id===user._id);
-  const canManageMenu = token && (user?.role==='admin' || isManagerOfTruck);
-  const canTruckChat = token && (user?.role==='admin' || user?.role==='manager' || user?.role==='staff');
-  const canUpdateLocation = token && (user?.role==='admin' || isManagerOfTruck);
+  const isManagerOfTruck = token && user?.role === 'manager' && truck?.manager && (truck.manager.id === user.id || truck.manager.id === user._id);
+  const canManageMenu = token && (user?.role === 'admin' || isManagerOfTruck);
+  const canTruckChat = token && (user?.role === 'admin' || user?.role === 'manager' || user?.role === 'staff');
+  const canUpdateLocation = token && (user?.role === 'admin' || isManagerOfTruck);
 
-  async function sendLiveLocation(lat, lng){
+  async function sendLiveLocation(lat, lng) {
     try {
       const res = await api.updateTruckStatusLocation(token, id, { liveLocation: { lat, lng } });
       if (res.success) {
         setTruck(t => ({ ...t, liveLocation: res.data.liveLocation }));
       }
-    } catch (e){ setLocError(e.message); }
+    } catch (e) { setLocError(e.message); }
   }
 
-  function updateOnce(){
+  function updateOnce() {
     setLocError(null); setLocBusy(true);
     if (!('geolocation' in navigator)) { setLocError('Geolocation not supported'); setLocBusy(false); return; }
     navigator.geolocation.getCurrentPosition(async pos => {
       const { latitude, longitude } = pos.coords;
       await sendLiveLocation(latitude, longitude);
       setLocBusy(false);
-    }, err => { setLocError(err.message||'Failed to get location'); setLocBusy(false); }, { enableHighAccuracy:true, timeout:10000, maximumAge:10000 });
+    }, err => { setLocError(err.message || 'Failed to get location'); setLocBusy(false); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 });
   }
 
-  function toggleAuto(){
+  function toggleAuto() {
     if (!('geolocation' in navigator)) { setLocError('Geolocation not supported'); return; }
     if (autoUpdate) {
       if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
@@ -103,51 +106,43 @@ export default function TruckDetail() {
       const idw = navigator.geolocation.watchPosition(async pos => {
         const { latitude, longitude } = pos.coords;
         await sendLiveLocation(latitude, longitude);
-      }, err => { setLocError(err.message||'Location error'); }, { enableHighAccuracy:true, maximumAge:10000 });
+      }, err => { setLocError(err.message || 'Location error'); }, { enableHighAccuracy: true, maximumAge: 10000 });
       watchIdRef.current = idw; setAutoUpdate(true);
     }
   }
 
-  async function saveManual(){
+  async function saveManual() {
     setLocError(null);
     const lat = Number(locForm.lat); const lng = Number(locForm.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) { setLocError('Enter valid latitude and longitude'); return; }
     setLocBusy(true);
     await sendLiveLocation(lat, lng);
     setLocBusy(false);
-  } 
+  }
   return (
     <div style={{ padding: 20, fontFamily: 'system-ui' }}>
       <h2>{truck.name}</h2>
-      {(() => {
-        const live = truck?.liveLocation;
-        const base = truck?.location;
-        const lat = typeof live?.lat === 'number' ? live.lat : (typeof base?.lat === 'number' ? base.lat : null);
-        const lng = typeof live?.lng === 'number' ? live.lng : (typeof base?.lng === 'number' ? base.lng : null);
-        if (lat !== null && lng !== null) {
-          return (
-            <>
-              <a
-                href={`https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}`}
-                target="_blank" rel="noreferrer"
-                style={{ display:'inline-block', margin:'6px 0 6px', fontSize:14 }}
-              >
-                Directions
-              </a>
-              <MapEmbed lat={lat} lng={lng} height={200} />
-            </>
-          );
-        }
-        return null;
-      })()}
-      {canTruckChat && (
-        <button onClick={()=> setChatOpen(true)} style={{ marginTop:6, marginBottom:10 }}>Truck Chat</button>
-      )}
+      <MapEmbed
+        height={200}
+        routePlan={truck.routePlan}
+        currentStopIndex={truck.currentStopIndex}
+        status={truck.status}
+        liveLocation={truck.liveLocation || truck.location}
+        truckId={truck.id || truck._id}
+      />
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '6px 0 10px' }}>
+        <a href="#menu-section" style={{ textDecoration: 'none' }}>
+          <button type="button">View Menu</button>
+        </a>
+        {canTruckChat && (
+          <button onClick={() => setChatOpen(true)}>Truck Chat</button>
+        )}
+      </div>
       <p>{truck.description}</p>
       {canUpdateLocation && (
-        <div style={{ margin:'8px 0 12px', padding:12, border:'1px solid #e5e7eb', borderRadius:6, background:'#f9fafb' }}>
-          <div style={{ marginBottom:6, fontWeight:600 }}>Live Location</div>
-          <div style={{ fontSize:13, marginBottom:8 }}>
+        <div style={{ margin: '8px 0 12px', padding: 12, border: '1px solid #e5e7eb', borderRadius: 6, background: '#f9fafb' }}>
+          <div style={{ marginBottom: 6, fontWeight: 600 }}>Live Location</div>
+          <div style={{ fontSize: 13, marginBottom: 8 }}>
             {(() => {
               const live = truck?.liveLocation;
               const base = truck?.location;
@@ -160,41 +155,41 @@ export default function TruckDetail() {
               );
             })()}
           </div>
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            <button type="button" onClick={updateOnce} disabled={locBusy}>{locBusy?'Updating…':'Update to my location'}</button>
-            <button type="button" onClick={toggleAuto}>{autoUpdate?'Stop auto-update':'Auto-update from my device'}</button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" onClick={updateOnce} disabled={locBusy}>{locBusy ? 'Updating…' : 'Update to my location'}</button>
+            <button type="button" onClick={toggleAuto}>{autoUpdate ? 'Stop auto-update' : 'Auto-update from my device'}</button>
           </div>
-          <div style={{ marginTop:8, display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
-            <input placeholder="Latitude" value={locForm.lat} onChange={e=> setLocForm(f=>({ ...f, lat:e.target.value }))} style={{ width:140 }} />
-            <input placeholder="Longitude" value={locForm.lng} onChange={e=> setLocForm(f=>({ ...f, lng:e.target.value }))} style={{ width:140 }} />
+          <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input placeholder="Latitude" value={locForm.lat} onChange={e => setLocForm(f => ({ ...f, lat: e.target.value }))} style={{ width: 140 }} />
+            <input placeholder="Longitude" value={locForm.lng} onChange={e => setLocForm(f => ({ ...f, lng: e.target.value }))} style={{ width: 140 }} />
             <button type="button" onClick={saveManual} disabled={locBusy}>Save location</button>
           </div>
-          {locError && <div style={{ color:'#b91c1c', fontSize:12, marginTop:6 }}>{locError}</div>}
-          {truck?.liveLocation && <div style={{ fontSize:11, opacity:.7, marginTop:6 }}>Last updated: {truck.liveLocation.updatedAt ? new Date(truck.liveLocation.updatedAt).toLocaleString() : 'now'}</div>}
+          {locError && <div style={{ color: '#b91c1c', fontSize: 12, marginTop: 6 }}>{locError}</div>}
+          {truck?.liveLocation && <div style={{ fontSize: 11, opacity: .7, marginTop: 6 }}>Last updated: {truck.liveLocation.updatedAt ? new Date(truck.liveLocation.updatedAt).toLocaleString() : 'now'}</div>}
         </div>
       )}
-      <h3>Menu</h3>
+      <h3 id="menu-section">Menu</h3>
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {menu.map(item => (
           <li key={item._id} style={{ marginBottom: 10 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-              <span>{item.name} - {formatCurrency(item.price)}{item.category?` · ${item.category}`:''}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span>{item.name} - {formatCurrency(item.price)}{item.category ? ` · ${item.category}` : ''}</span>
             </div>
           </li>
         ))}
       </ul>
       {canManageMenu && (
-        <a href={`/trucks/${id}/menu-manage`} style={{ display:'inline-block', marginTop:12 }}>Manage Menu</a>
+        <a href={`/trucks/${id}/menu-manage`} style={{ display: 'inline-block', marginTop: 12 }}>Manage Menu</a>
       )}
       <ChatDrawer
         open={chatOpen}
-        onClose={()=> setChatOpen(false)}
+        onClose={() => setChatOpen(false)}
         title={`Truck Chat · ${truck.name}`}
-        roomResolver={(tok)=> chatApi.getTruckRoom(tok, id)}
+        roomResolver={(tok) => chatApi.getTruckRoom(tok, id)}
       />
     </div>
   );
 }
 
-const miniBtn = { cursor:'pointer', border:'1px solid #bbb', background:'#fafafa', fontSize:12, padding:'3px 6px', lineHeight:1, borderRadius:4 };
-const chip = { cursor:'pointer', border:'1px solid #ddd', background:'#f8f8f8', fontSize:12, padding:'3px 8px', lineHeight:1.4, borderRadius:999 };
+const miniBtn = { cursor: 'pointer', border: '1px solid #bbb', background: '#fafafa', fontSize: 12, padding: '3px 6px', lineHeight: 1, borderRadius: 4 };
+const chip = { cursor: 'pointer', border: '1px solid #ddd', background: '#f8f8f8', fontSize: 12, padding: '3px 8px', lineHeight: 1.4, borderRadius: 999 };

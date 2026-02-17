@@ -1,11 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
 import { chatApi } from '../api/chat';
 import ChatDrawer from '../components/ChatDrawer';
-import MapEmbed from '../components/MapEmbed';
-import { getSocket } from '../realtime/socket';
+import { useSocketRooms } from '../hooks/useSocketRooms';
 import { useLiveEta } from '../hooks/useLiveEta';
 
 // Helpers for simple ETA estimation without external APIs
@@ -24,6 +23,20 @@ function estimateTravelMinutes(distanceKm, mode) {
   const speed = speeds[mode] || speeds.driving;
   const hours = distanceKm / speed;
   return Math.max(1, Math.round(hours * 60));
+}
+
+function normalizeOrderStatus(status) {
+  const key = String(status || '').trim().toUpperCase();
+  const map = {
+    PENDING: 'PLACED',
+    ACCEPTED: 'ACCEPTED',
+    PREPARING: 'PREPARING',
+    READY: 'READY',
+    DELIVERED: 'COMPLETED',
+    COMPLETED: 'COMPLETED',
+    CANCELLED: 'CANCELLED'
+  };
+  return map[key] || key;
 }
 
 function PickupPlanner({ order, coords, defaultPrep = 20 }){
@@ -53,7 +66,7 @@ function PickupPlanner({ order, coords, defaultPrep = 20 }){
     // Fallback rough estimate
     const d = haversineKm(myPos.lat, myPos.lng, coords.lat, coords.lng);
     setEtaMin(estimateTravelMinutes(d, mode));
-  }, [myPos, coords?.lat, coords?.lng, mode, live.status, live.minutes, apiKey]);
+  }, [myPos, coords?.lat, coords?.lng, mode, live.status, live.minutes]);
 
   function useMyLocation(){
     setErr(null); setBusy(true);
@@ -67,7 +80,7 @@ function PickupPlanner({ order, coords, defaultPrep = 20 }){
   const suggestion = (() => {
     if (!etaMin) return null;
     // If order is already ready, advise to start now
-    if (order.status === 'ready') return 'Order is ready — start now to pick up.';
+    if (normalizeOrderStatus(order.status) === 'READY') return 'Order is ready — start now to pick up.';
     const diff = prepMin - etaMin;
     if (diff > 0) return `Leave in ~${diff} min to arrive when it’s ready.`;
     if (diff === 0) return 'Start now to arrive when it’s ready.';
@@ -159,8 +172,8 @@ export default function Orders() {
           });
         }
         
-        if (ordersRes.success) setOrders(filteredOrders);
         if (ordersRes.success) {
+          setOrders(filteredOrders);
           const map = {};
           filteredOrders.forEach(o => { map[o._id] = o.status; });
           prevStatusRef.current = map;
@@ -206,48 +219,88 @@ export default function Orders() {
 
   // Removed polling; websocket updates drive status changes and we still fetch initial data above
 
-  // Realtime: subscribe to relevant rooms for current orders (must be before any early returns)
-  useEffect(() => {
-    if (!token || !orders.length) return;
-    const sock = getSocket(token);
-    const orderRooms = new Set();
-    const truckRooms = new Set();
+  const trackedTruckIds = useMemo(() => {
+    const ids = new Set();
+    if (user?.assignedTruck) ids.add(user.assignedTruck);
     orders.forEach(o => {
-      orderRooms.add(`order:${o._id}`);
       const tid = getTruckId(o);
-      if (tid) truckRooms.add(`truck:${tid}`);
+      if (tid) ids.add(tid);
     });
-    orderRooms.forEach(room => sock.emit('subscribe', { room }));
-    truckRooms.forEach(room => sock.emit('subscribe', { room }));
+    return Array.from(ids).sort();
+  }, [orders, user?.assignedTruck]);
 
-    const onOrder = ({ orderId, status }) => {
-      setOrders(list => list.map(o => o._id === orderId ? { ...o, status } : o));
-      // For customers, trigger browser notification when a specific order becomes ready
-      if (user?.role === 'customer') {
-        const prev = prevStatusRef.current[orderId];
-        if (status === 'ready' && prev !== 'ready' && prev !== 'delivered' && prev !== 'cancelled' && !notifiedRef.current.has(orderId)) {
-          const o = orders.find(x => x._id === orderId) || { _id: orderId };
-          notifyReady({ ...o, status });
-          notifiedRef.current.add(orderId);
-        }
-        // update prev state map
-        prevStatusRef.current[orderId] = status;
-      }
-    };
-    const onTruckLoc = ({ truckId, liveLocation }) => {
-      setTrucksById(map => ({ ...map, [truckId]: { ...(map[truckId] || {}), id: truckId, liveLocation } }));
-    };
-    sock.on('order:update', onOrder);
-    sock.on('truck:location', onTruckLoc);
-    return () => {
-      try {
-        orderRooms.forEach(room => sock.emit('unsubscribe', { room }));
-        truckRooms.forEach(room => sock.emit('unsubscribe', { room }));
-        sock.off('order:update', onOrder);
-        sock.off('truck:location', onTruckLoc);
-      } catch {}
-    };
-  }, [token, orders]);
+  const roomList = useMemo(() => {
+    const rooms = new Set();
+    const userId = user?.id || user?._id;
+    if (user?.role === 'customer' && userId) rooms.add(`user:${userId}`);
+    if (user?.role === 'staff' && user?.assignedTruck) rooms.add(`truck:${user.assignedTruck}`);
+    if (user?.role === 'manager' && userId) rooms.add(`orders:manager:${userId}`);
+    if (user?.role === 'admin') rooms.add('orders:admin');
+    trackedTruckIds.forEach(id => rooms.add(`truck:${id}`));
+    return Array.from(rooms);
+  }, [user?.role, user?.assignedTruck, user?.id, user?._id, trackedTruckIds]);
+
+  const shouldIncludeOrder = useCallback((incoming) => {
+    if (!incoming) return false;
+    if (user?.role === 'staff' && user?.assignedTruck) {
+      const tid = getTruckId(incoming);
+      return tid === user.assignedTruck;
+    }
+    return true;
+  }, [user?.role, user?.assignedTruck]);
+
+  const upsertOrder = useCallback((incoming) => {
+    if (!incoming || !shouldIncludeOrder(incoming)) return;
+    const id = incoming._id || incoming.id;
+    if (!id) return;
+    setOrders(list => {
+      const idx = list.findIndex(o => (o._id || o.id) === id);
+      if (idx === -1) return [incoming, ...list];
+      const next = list.slice();
+      next[idx] = { ...next[idx], ...incoming };
+      return next;
+    });
+  }, [shouldIncludeOrder]);
+
+  const handleStatusNotify = useCallback((orderId, nextStatus, orderForNotify) => {
+    if (user?.role !== 'customer') return;
+    const prev = prevStatusRef.current[orderId];
+    const nextKey = normalizeOrderStatus(nextStatus);
+    const prevKey = normalizeOrderStatus(prev);
+    if (nextKey === 'READY' && prevKey !== 'READY' && prevKey !== 'COMPLETED' && prevKey !== 'CANCELLED' && !notifiedRef.current.has(orderId)) {
+      notifyReady({ ...(orderForNotify || { _id: orderId }), status: nextKey });
+      notifiedRef.current.add(orderId);
+    }
+    prevStatusRef.current[orderId] = nextKey;
+  }, [user?.role]);
+
+  const onOrderNew = useCallback(({ order }) => {
+    if (!order) return;
+    upsertOrder(order);
+    if (order._id && order.status) handleStatusNotify(order._id, order.status, order);
+  }, [upsertOrder, handleStatusNotify]);
+
+  const onOrderUpdate = useCallback(({ orderId, status, order }) => {
+    const incoming = order || (orderId ? { _id: orderId, status } : null);
+    if (!incoming) return;
+    upsertOrder(incoming);
+    const id = orderId || incoming._id;
+    if (id && (status || incoming.status)) {
+      handleStatusNotify(id, status || incoming.status, incoming);
+    }
+  }, [upsertOrder, handleStatusNotify]);
+
+  const onTruckLoc = useCallback(({ truckId, liveLocation }) => {
+    setTrucksById(map => ({ ...map, [truckId]: { ...(map[truckId] || {}), id: truckId, liveLocation } }));
+  }, []);
+
+  const listeners = useMemo(() => ({
+    'order:new': onOrderNew,
+    'order:update': onOrderUpdate,
+    'truck:location': onTruckLoc
+  }), [onOrderNew, onOrderUpdate, onTruckLoc]);
+
+  useSocketRooms({ token, rooms: roomList, listeners, enabled: Boolean(token && user?.role) });
 
   function notifyReady(order){
     if (typeof window === 'undefined' || !('Notification' in window)) return;
@@ -266,11 +319,9 @@ export default function Orders() {
   }
 
   function getNextStatus(current) {
-    // Normalize legacy labels to backend targets
-    const legacy = { accepted: 'preparing', completed: 'delivered' };
-    if (legacy[current]) return legacy[current];
-    const flow = ['pending','preparing','ready','delivered'];
-    const idx = flow.indexOf(current);
+    const key = normalizeOrderStatus(current);
+    const flow = ['PLACED','ACCEPTED','PREPARING','READY','COMPLETED'];
+    const idx = flow.indexOf(key);
     if (idx === -1 || idx === flow.length - 1) return null;
     return flow[idx + 1];
   }
@@ -338,15 +389,17 @@ export default function Orders() {
   }
 
   function displayStatus(status){
-    if (user?.role !== 'customer') return status;
+    const key = normalizeOrderStatus(status);
+    if (user?.role !== 'customer') return key || status;
     const map = {
-      pending: 'received',
-      preparing: 'preparing',
-      ready: 'ready for pickup',
-      delivered: 'picked up',
-      cancelled: 'cancelled'
+      PLACED: 'placed',
+      ACCEPTED: 'accepted',
+      PREPARING: 'preparing',
+      READY: 'ready for pickup',
+      COMPLETED: 'picked up',
+      CANCELLED: 'cancelled'
     };
-    return map[status] || status;
+    return map[key] || key || status;
   }
 
   if (loading) return <p style={{ padding: 20 }}>Loading orders...</p>;
@@ -414,7 +467,12 @@ export default function Orders() {
                       <td style={td}>
                         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                           {['manager','staff','admin'].includes(user.role) && (
-                            <button onClick={() => advanceStatus(o)} disabled={!getNextStatus(o.status) || ['cancelled','delivered'].includes(o.status)}>Next</button>
+                            <button
+                              onClick={() => advanceStatus(o)}
+                              disabled={!getNextStatus(o.status) || ['CANCELLED','COMPLETED'].includes(normalizeOrderStatus(o.status))}
+                            >
+                              Next
+                            </button>
                           )}
                           {token && (
                             <button onClick={() => openChat(o)}>Chat</button>
@@ -432,16 +490,8 @@ export default function Orders() {
                             <a href={`/trucks/${getTruckId(o)}`} style={{ textDecoration:'none' }}>
                               <button type="button">View Truck</button>
                             </a>
-                            {directionsUrl(o) && (
-                              <a href={directionsUrl(o)} target="_blank" rel="noreferrer" style={{ textDecoration:'none' }}>
-                                <button type="button">Directions</button>
-                              </a>
-                            )}
                             {token && <button onClick={() => openChat(o)}>Chat</button>}
                           </div>
-                          {coords(o) && (
-                            <MapEmbed lat={coords(o).lat} lng={coords(o).lng} height={160} />
-                          )}
                           <PickupPlanner order={o} coords={coords(o)} defaultPrep={prepDefault(o)} />
                         </div>
                       </td>
@@ -459,7 +509,12 @@ export default function Orders() {
                       <td style={td}>
                         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                           {['manager','staff','admin'].includes(user.role) && (
-                            <button onClick={() => advanceStatus(o)} disabled={!getNextStatus(o.status) || ['cancelled','delivered'].includes(o.status)}>Next</button>
+                            <button
+                              onClick={() => advanceStatus(o)}
+                              disabled={!getNextStatus(o.status) || ['CANCELLED','COMPLETED'].includes(normalizeOrderStatus(o.status))}
+                            >
+                              Next
+                            </button>
                           )}
                           {token && (
                             <button onClick={() => openChat(o)}>Chat</button>

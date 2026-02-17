@@ -28,7 +28,7 @@ async function run() {
     name: 'Seed Truck One',
     cuisineType: 'Fusion',
     manager: manager._id,
-    status: 'active',
+    status: 'OPEN',
     capacity: 4,
     location: { lat: 12.9716, lng: 77.5946 },
     liveLocation: { lat: 12.9716, lng: 77.5946, updatedAt: new Date() }

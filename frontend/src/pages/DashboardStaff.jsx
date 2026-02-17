@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
+import { useSocketRooms } from '../hooks/useSocketRooms';
 
 export default function DashboardStaff(){
   const { token, user } = useAuth();
@@ -28,9 +29,37 @@ export default function DashboardStaff(){
       .finally(() => setLoading(false));
   }, [user, token]);
 
-  const pendingOrders = orders.filter(o => o.status === 'pending').length;
-  const preparingOrders = orders.filter(o => o.status === 'preparing').length;
-  const readyOrders = orders.filter(o => o.status === 'ready').length;
+  const room = useMemo(() => (user?.assignedTruck ? [`truck:${user.assignedTruck}`] : []), [user?.assignedTruck]);
+  const handleOrderNew = useCallback(({ order }) => {
+    if (!order) return;
+    const tid = typeof order.truck === 'object' ? (order.truck.id || order.truck._id) : order.truck;
+    if (tid !== user?.assignedTruck) return;
+    setOrders(list => {
+      const exists = list.some(o => (o._id || o.id) === (order._id || order.id));
+      if (exists) return list;
+      return [order, ...list];
+    });
+  }, [user?.assignedTruck]);
+
+  const handleOrderUpdate = useCallback(({ orderId, status, order }) => {
+    const incoming = order || (orderId ? { _id: orderId, status } : null);
+    if (!incoming) return;
+    const tid = typeof incoming.truck === 'object' ? (incoming.truck.id || incoming.truck._id) : incoming.truck;
+    if (tid && tid !== user?.assignedTruck) return;
+    setOrders(list => list.map(o => (o._id || o.id) === (incoming._id || incoming.id) ? { ...o, ...incoming } : o));
+  }, [user?.assignedTruck]);
+
+  const listeners = useMemo(() => ({
+    'order:new': handleOrderNew,
+    'order:update': handleOrderUpdate
+  }), [handleOrderNew, handleOrderUpdate]);
+  useSocketRooms({ token, rooms: room, listeners, enabled: Boolean(token && user?.assignedTruck) });
+
+  const normalizeStatus = (status) => String(status || '').trim().toUpperCase();
+  const placedOrders = orders.filter(o => normalizeStatus(o.status) === 'PLACED').length;
+  const acceptedOrders = orders.filter(o => normalizeStatus(o.status) === 'ACCEPTED').length;
+  const preparingOrders = orders.filter(o => normalizeStatus(o.status) === 'PREPARING').length;
+  const readyOrders = orders.filter(o => normalizeStatus(o.status) === 'READY').length;
   const totalRevenue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
 
   return (
@@ -49,8 +78,12 @@ export default function DashboardStaff(){
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
             <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, padding: 16 }}>
-              <div style={{ fontSize: 12, color: '#856404', marginBottom: 8 }}>Pending Orders</div>
-              <div style={{ fontSize: 28, fontWeight: 'bold', color: '#ff8c00' }}>{pendingOrders}</div>
+              <div style={{ fontSize: 12, color: '#856404', marginBottom: 8 }}>Placed Orders</div>
+              <div style={{ fontSize: 28, fontWeight: 'bold', color: '#ff8c00' }}>{placedOrders}</div>
+            </div>
+            <div style={{ background: '#ede9fe', border: '1px solid #8b5cf6', borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: 12, color: '#5b21b6', marginBottom: 8 }}>Accepted</div>
+              <div style={{ fontSize: 28, fontWeight: 'bold', color: '#6d28d9' }}>{acceptedOrders}</div>
             </div>
             <div style={{ background: '#e2e3e5', border: '1px solid #6c757d', borderRadius: 8, padding: 16 }}>
               <div style={{ fontSize: 12, color: '#383d41', marginBottom: 8 }}>Preparing</div>
