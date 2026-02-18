@@ -13,6 +13,8 @@ const connectOnce = async (uri) => {
 const connectDB = async () => {
   const primaryUri = process.env.MONGO_URI;
   try {
+    const obscuredUri = primaryUri ? primaryUri.replace(/\/\/.*@/, '//***:***@') : 'none';
+    console.log(`Connecting to MongoDB: ${obscuredUri}`);
     await connectOnce(primaryUri);
     console.log('MongoDB Connected');
   } catch (err) {
