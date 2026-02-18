@@ -1,0 +1,35 @@
+services:
+  mongo:
+    image: mongo:latest
+    container_name: food-truck-mongo
+    restart: always
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  backend:
+    build: ./backend
+    container_name: food-truck-backend
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - MONGO_URI=mongodb://mongo:27017/smart-food-truck
+      - JWT_SECRET=2300031018
+      - REDIS_DISABLED=true
+    depends_on:
+      - mongo
+
+  frontend:
+    build: ./frontend
+    container_name: food-truck-frontend
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo-data:
