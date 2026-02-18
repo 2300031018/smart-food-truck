@@ -4,15 +4,16 @@ services:
     name: smart-food-truck-backend
     env: node
     plan: free
+    rootDir: backend
     buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: MONGO_URI
-        sync: false # Set manually in Render Dashboard
+        sync: false
       - key: JWT_SECRET
-        sync: false # Set manually in Render Dashboard
+        sync: false
       - key: CORS_ORIGIN
-        sync: false # Set to your frontend URL after deployment
+        sync: false
       - key: NODE_ENV
         value: production
 
@@ -21,8 +22,9 @@ services:
     name: smart-food-truck-frontend
     env: static
     plan: free
+    rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     envVars:
       - key: VITE_API_BASE_URL
-        sync: false # Set to your backend URL after deployment
+        sync: false
