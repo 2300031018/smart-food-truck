@@ -321,6 +321,22 @@ export default function Orders() {
     }
   }
 
+  async function handleCancelOrder(order) {
+    const reason = window.prompt(`Are you sure you want to cancel order ${orderCode(order)}? Please provide a reason:`,
+      user?.role === 'customer' ? 'Customer cancelled' : 'Manager cancelled');
+
+    if (reason === null) return; // Cancelled prompt
+
+    try {
+      const res = await api.updateOrderStatus(token, order._id, 'CANCELLED');
+      if (res.success) {
+        setOrders(o => o.map(or => or._id === order._id ? { ...or, status: 'CANCELLED' } : or));
+      }
+    } catch (e) {
+      alert(e.message || 'Failed to cancel order');
+    }
+  }
+
   function toggleExpand(orderId) {
     const newSet = new Set(expandedOrders);
     if (newSet.has(orderId)) {
@@ -467,6 +483,9 @@ export default function Orders() {
                         <Link to={`/trucks/${tid}`} style={{ textDecoration: 'none' }}>
                           <button type="button">View Truck</button>
                         </Link>
+                        {o.status === 'PLACED' && (
+                          <button type="button" style={{ background: '#fee2e2', color: '#dc2626', borderColor: '#fecaca' }} onClick={() => handleCancelOrder(o)}>Cancel</button>
+                        )}
                       </div>
                       <PickupPlanner order={o} coords={coords(o)} defaultPrep={prepDefault(o)} />
                     </td>
@@ -478,6 +497,9 @@ export default function Orders() {
                       <td style={td}>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => advanceStatus(o)} disabled={!getNextStatus(o.status)}>Next</button>
+                          {!['COMPLETED', 'CANCELLED'].includes(normalizeOrderStatus(o.status)) && (
+                            <button style={{ background: '#fee2e2', color: '#dc2626', borderColor: '#fecaca' }} onClick={() => handleCancelOrder(o)}>Cancel</button>
+                          )}
                         </div>
                       </td>
                     </>

@@ -172,7 +172,7 @@ exports.updateStatus = asyncHandler(async (req, res) => {
   // Customer special case: only cancel while placed or accepted
   if (req.user.role === 'customer') {
     if (normalizedTarget !== 'CANCELLED') return res.status(403).json({ success: false, error: { message: 'Customers may only cancel' } });
-    if (!['PLACED', 'ACCEPTED'].includes(order.status)) return res.status(409).json({ success: false, error: { message: 'Cannot cancel after preparation starts' } });
+    if (order.status !== 'PLACED') return res.status(409).json({ success: false, error: { message: 'Cannot cancel after staff has accepted' } });
     order.status = 'CANCELLED';
     order.cancelledAt = new Date();
     order.cancelReason = reason || 'Customer cancelled';
