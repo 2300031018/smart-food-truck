@@ -5,7 +5,7 @@ let socketInstance = null;
 export function getSocket(token) {
   if (socketInstance) return socketInstance;
   // Prefer explicit backend URL via Vite env; fallback to common dev port swap
-  const url = import.meta.env.VITE_BACKEND_URL || window.location.origin;
+  const url = import.meta.env.VITE_API_TARGET || import.meta.env.VITE_BACKEND_URL || window.location.origin;
   socketInstance = io(url, {
     path: '/socket.io',
     autoConnect: true,
@@ -17,7 +17,7 @@ export function getSocket(token) {
 
 export function closeSocket() {
   if (socketInstance) {
-    try { socketInstance.close(); } catch {}
+    try { socketInstance.close(); } catch { }
     socketInstance = null;
   }
 }

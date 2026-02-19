@@ -1,5 +1,7 @@
 // Simple API client wrapper
-export const API_BASE = '/api';
+const isProd = import.meta.env.PROD;
+const target = import.meta.env.VITE_API_TARGET || '';
+export const API_BASE = isProd ? (target.endsWith('/api') ? target : `${target}/api`) : '/api';
 
 function getHeaders(token, isJson = true) {
   const headers = {};

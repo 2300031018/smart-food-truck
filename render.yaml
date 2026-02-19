@@ -12,7 +12,7 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
-      - key: CORS_ORIGIN
+      - key: CORS_WHITELIST
         sync: false
       - key: NODE_ENV
         value: production
