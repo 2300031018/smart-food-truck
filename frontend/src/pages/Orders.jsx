@@ -8,7 +8,6 @@ import ChatDrawer from '../components/ChatDrawer';
 import { useSocketRooms } from '../hooks/useSocketRooms';
 import { useLiveEta } from '../hooks/useLiveEta';
 
-// Helpers for simple ETA estimation without external APIs
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371; // km
   const dLat = (lat2 - lat1) * Math.PI / 180;
