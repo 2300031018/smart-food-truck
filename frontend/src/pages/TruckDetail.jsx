@@ -18,6 +18,9 @@ export default function TruckDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [menu, setMenu] = useState([]);
+  const [cart, setCart] = useState({}); // itemId -> quantity
+  const [notes, setNotes] = useState('');
+  const [ordering, setOrdering] = useState(false);
   const watchIdRef = useRef(null);
 
   useEffect(() => {
@@ -118,6 +121,54 @@ export default function TruckDetail() {
     await sendLiveLocation(lat, lng);
     setLocBusy(false);
   }
+
+  const addToCart = (item) => {
+    setCart(prev => ({
+      ...prev,
+      [item._id]: (prev[item._id] || 0) + 1
+    }));
+  };
+
+  const removeFromCart = (itemId) => {
+    setCart(prev => {
+      const next = { ...prev };
+      if (next[itemId] > 1) next[itemId]--;
+      else delete next[itemId];
+      return next;
+    });
+  };
+
+  const cartItems = Object.entries(cart).map(([id, qty]) => {
+    const item = menu.find(m => m._id === id);
+    return item ? { ...item, quantity: qty } : null;
+  }).filter(Boolean);
+
+  const cartTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+  async function handlePlaceOrder() {
+    if (!token) return navigate('/login');
+    if (cartItems.length === 0) return;
+    setOrdering(true);
+    try {
+      const payload = {
+        truck: id,
+        items: cartItems.map(it => ({ menuItem: it._id, quantity: it.quantity })),
+        notes
+      };
+      const res = await api.createOrder(token, payload);
+      if (res.success) {
+        alert('Order placed successfully!');
+        setCart({});
+        setNotes('');
+        navigate('/orders');
+      }
+    } catch (e) {
+      alert(e.message || 'Failed to place order');
+    } finally {
+      setOrdering(false);
+    }
+  }
+
   return (
     <div style={{ padding: 20, fontFamily: 'system-ui' }}>
       <h2>{truck.name}</h2>
@@ -180,15 +231,60 @@ export default function TruckDetail() {
         </div>
       )}
       <h3 id="menu-section">Menu</h3>
-      <ul style={{ listStyle: 'none', padding: 0 }}>
+      <div style={{ display: 'grid', gap: 12, marginBottom: 20 }}>
         {menu.map(item => (
-          <li key={item._id} style={{ marginBottom: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span>{item.name} - {formatCurrency(item.price)}{item.category ? ` · ${item.category}` : ''}</span>
+          <div key={item._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', border: '1px solid #eee', borderRadius: 8, background: '#fff' }}>
+            <div>
+              <div style={{ fontWeight: 600 }}>{item.name}</div>
+              <div style={{ fontSize: 13, color: '#666' }}>{formatCurrency(item.price)}{item.category ? ` · ${item.category}` : ''}</div>
             </div>
-          </li>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {cart[item._id] ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f3f4f6', padding: '4px 8px', borderRadius: 6 }}>
+                  <button onClick={() => removeFromCart(item._id)} style={miniBtn}>-</button>
+                  <span style={{ fontWeight: 600, minWidth: 20, textAlign: 'center' }}>{cart[item._id]}</span>
+                  <button onClick={() => addToCart(item)} style={miniBtn}>+</button>
+                </div>
+              ) : (
+                <button onClick={() => addToCart(item)}>Add</button>
+              )}
+            </div>
+          </div>
         ))}
-      </ul>
+      </div>
+
+      {cartItems.length > 0 && (
+        <div style={{ marginTop: 20, padding: 16, border: '1px solid #ddd6fe', borderRadius: 8, background: '#fdfcfe' }}>
+          <h4 style={{ margin: '0 0 12px 0' }}>Your Order</h4>
+          {cartItems.map(item => (
+            <div key={item._id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 6 }}>
+              <span>{item.name} x {item.quantity}</span>
+              <span>{formatCurrency(item.price * item.quantity)}</span>
+            </div>
+          ))}
+          <div style={{ borderTop: '1px solid #eee', margin: '10px 0', paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+            <span>Total</span>
+            <span>{formatCurrency(cartTotal)}</span>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 500 }}>Notes for the truck</label>
+            <textarea
+              placeholder="Any special instructions?"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #ddd', fontSize: 13, height: 60 }}
+            />
+          </div>
+          <button
+            onClick={handlePlaceOrder}
+            disabled={ordering}
+            style={{ width: '100%', padding: '10px', background: '#5b21b6', color: 'white', border: 'none', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}
+          >
+            {ordering ? 'Placing Order...' : `Place Order · ${formatCurrency(cartTotal)}`}
+          </button>
+        </div>
+      )}
+
       {canManageMenu && (
         <a href={`/trucks/${id}/menu-manage`} style={{ display: 'inline-block', marginTop: 12 }}>Manage Menu</a>
       )}

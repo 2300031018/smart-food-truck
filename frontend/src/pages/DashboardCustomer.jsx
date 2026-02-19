@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 
-export default function DashboardCustomer(){
+export default function DashboardCustomer() {
   const { user, token } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,20 +34,12 @@ export default function DashboardCustomer(){
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
         <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, padding: 16 }}>
-          <div style={{ fontSize: 12, color: '#856404', marginBottom: 8 }}>Active Orders</div>
+          <div style={{ fontSize: 12, color: '#856404', marginBottom: 8 }}>My Active Orders</div>
           <div style={{ fontSize: 28, fontWeight: 'bold', color: '#ff8c00' }}>{activeOrders}</div>
         </div>
         <div style={{ background: '#e3f2fd', border: '1px solid #2196f3', borderRadius: 8, padding: 16 }}>
-          <div style={{ fontSize: 12, color: '#0d47a1', marginBottom: 8 }}>Total Orders</div>
+          <div style={{ fontSize: 12, color: '#0d47a1', marginBottom: 8 }}>Order History</div>
           <div style={{ fontSize: 28, fontWeight: 'bold', color: '#1976d2' }}>{orders.length}</div>
-        </div>
-        <div style={{ background: '#e0f2f1', border: '1px solid #009688', borderRadius: 8, padding: 16 }}>
-          <div style={{ fontSize: 12, color: '#004d40', marginBottom: 8 }}>Total Spent</div>
-          <div style={{ fontSize: 24, fontWeight: 'bold', color: '#00897b' }}>₹{totalSpent.toFixed(2)}</div>
-        </div>
-        <div style={{ background: '#f3e5f5', border: '1px solid #9c27b0', borderRadius: 8, padding: 16 }}>
-          <div style={{ fontSize: 12, color: '#4a148c', marginBottom: 8 }}>Avg Order Value</div>
-          <div style={{ fontSize: 24, fontWeight: 'bold', color: '#7b1fa2' }}>₹{averageOrderValue}</div>
         </div>
       </div>
 

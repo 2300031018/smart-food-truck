@@ -4,7 +4,6 @@ import Signup from './pages/Signup';
 import Trucks from './pages/Trucks';
 import TruckDetail from './pages/TruckDetail';
 import MenuManage from './pages/MenuManage';
-import OrderCreate from './pages/OrderCreate';
 import Orders from './pages/Orders';
 import Layout from './components/Layout';
 import RoleRoute from './components/RoleRoute';
@@ -30,11 +29,10 @@ function HomeRedirect() {
   const { token, user } = useAuth();
   if (!token) return <Navigate to="/trucks" replace />;
   const role = user?.role;
-  const dest = role === 'customer' ? '/customer'
-    : role === 'admin' ? '/admin'
+  const dest = role === 'admin' ? '/admin'
     : role === 'manager' ? '/manager'
-    : role === 'staff' ? '/staff'
-    : '/trucks';
+      : role === 'staff' ? '/staff'
+        : '/trucks';
   return <Navigate to={dest} replace />;
 }
 
@@ -48,7 +46,7 @@ export default function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/trucks" element={<Trucks />} />
           <Route path="/trucks/:id" element={<TruckDetail />} />
-          <Route path="/trucks/:id/menu-manage" element={<RoleRoute roles={['admin','manager']}><MenuManage /></RoleRoute>} />
+          <Route path="/trucks/:id/menu-manage" element={<RoleRoute roles={['admin', 'manager']}><MenuManage /></RoleRoute>} />
           <Route path="/admin" element={<RoleRoute roles={['admin']}><DashboardAdmin /></RoleRoute>} />
           <Route path="/admin/trucks" element={<RoleRoute roles={['admin']}><AdminTrucks /></RoleRoute>} />
           <Route path="/admin/managers" element={<RoleRoute roles={['admin']}><AdminManagers /></RoleRoute>} />
@@ -60,7 +58,6 @@ export default function App() {
           <Route path="/staff" element={<RoleRoute roles={['staff']}><DashboardStaff /></RoleRoute>} />
           <Route path="/customer" element={<RoleRoute roles={['customer']}><DashboardCustomer /></RoleRoute>} />
           <Route path="/orders" element={<Protected><Orders /></Protected>} />
-          <Route path="/orders/new" element={<Protected><OrderCreate /></Protected>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

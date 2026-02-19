@@ -39,10 +39,9 @@ export default function Layout({ children }) {
   } else if (role === 'customer') {
     // Customer — Interaction
     navLinks.push(
-      { to: '/customer', label: 'Dashboard' },
       { to: '/trucks', label: 'Find Trucks' },
-      { to: '/orders/new', label: 'New Order' },
-      { to: '/orders', label: 'My Orders' }
+      { to: '/orders', label: 'My Orders' },
+      { to: '/customer', label: 'Dashboard' }
     );
   }
 
@@ -51,7 +50,7 @@ export default function Layout({ children }) {
       <nav style={{ background: '#222', color: '#fff', padding: '10px 20px', display: 'flex', gap: 16, alignItems: 'center' }}>
         <strong>Smart Food Truck</strong>
         {navLinks.map(link => (
-          <Link key={link.to} style={{ color:'#fff' }} to={link.to}>{link.label}</Link>
+          <Link key={link.to} style={{ color: '#fff' }} to={link.to}>{link.label}</Link>
         ))}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center' }}>
           {token ? (
