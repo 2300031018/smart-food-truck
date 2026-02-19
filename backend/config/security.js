@@ -9,7 +9,8 @@ const defaultWhitelist = [
   'http://127.0.0.1:5173',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
-  'http://127.0.0.1:2999'
+  'http://127.0.0.1:2999',
+  'https://pranavtummalasmartfoodtruck.app'
 ];
 const whitelistOverride = (process.env.CORS_WHITELIST || defaultWhitelist.join(',')).split(',').map(o => o.trim()).filter(Boolean);
 const allowLocalOrigin = origin => typeof origin === 'string' && /https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(origin);
@@ -23,7 +24,7 @@ module.exports = {
       return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
-    methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS']
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
   },
   rateLimits: {
     auth: { windowMs: 15 * 60 * 1000, max: 50, standardHeaders: true, legacyHeaders: false },
