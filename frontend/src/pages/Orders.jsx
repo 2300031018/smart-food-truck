@@ -360,15 +360,67 @@ export default function Orders() {
     return map[key] || key || status;
   }
 
+  const normalizeStatus = (status) => String(status || '').trim().toUpperCase();
+  const activeOrders = orders.filter(o => !['COMPLETED', 'CANCELLED'].includes(normalizeStatus(o.status))).length;
+  const totalRevenue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+
+  const placedOrders = orders.filter(o => normalizeStatus(o.status) === 'PLACED').length;
+  const acceptedOrders = orders.filter(o => normalizeStatus(o.status) === 'ACCEPTED').length;
+  const preparingOrders = orders.filter(o => normalizeStatus(o.status) === 'PREPARING').length;
+  const readyOrders = orders.filter(o => normalizeStatus(o.status) === 'READY').length;
+
   if (loading) return <p style={{ padding: 20 }}>Loading orders...</p>;
   if (error) return <p style={{ padding: 20, color: 'red' }}>{error}</p>;
+
+  const isStaff = user?.role === 'staff';
+  const isCustomer = user?.role === 'customer';
+
 
   return (
     <div style={{ padding: 20 }}>
       <h2>Orders ({orders.length})</h2>
-      {user?.role === 'customer' && (
+
+      {isCustomer && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
+          <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, padding: 16 }}>
+            <div style={{ fontSize: 12, color: '#856404', marginBottom: 8 }}>Active Orders</div>
+            <div style={{ fontSize: 24, fontWeight: 'bold', color: '#ff8c00' }}>{activeOrders}</div>
+          </div>
+          <div style={{ background: '#e3f2fd', border: '1px solid #2196f3', borderRadius: 8, padding: 16 }}>
+            <div style={{ fontSize: 12, color: '#0d47a1', marginBottom: 8 }}>Total Orders</div>
+            <div style={{ fontSize: 24, fontWeight: 'bold', color: '#1976d2' }}>{orders.length}</div>
+          </div>
+        </div>
+      )}
+
+      {isStaff && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
+          <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, padding: 12 }}>
+            <div style={{ fontSize: 11, color: '#856404', marginBottom: 4 }}>Placed</div>
+            <div style={{ fontSize: 20, fontWeight: 'bold', color: '#ff8c00' }}>{placedOrders}</div>
+          </div>
+          <div style={{ background: '#ede9fe', border: '1px solid #8b5cf6', borderRadius: 8, padding: 12 }}>
+            <div style={{ fontSize: 11, color: '#5b21b6', marginBottom: 4 }}>Accepted</div>
+            <div style={{ fontSize: 20, fontWeight: 'bold', color: '#6d28d9' }}>{acceptedOrders}</div>
+          </div>
+          <div style={{ background: '#e2e3e5', border: '1px solid #6c757d', borderRadius: 8, padding: 12 }}>
+            <div style={{ fontSize: 11, color: '#383d41', marginBottom: 4 }}>Preparing</div>
+            <div style={{ fontSize: 20, fontWeight: 'bold', color: '#495057' }}>{preparingOrders}</div>
+          </div>
+          <div style={{ background: '#d1e7dd', border: '1px solid #198754', borderRadius: 8, padding: 12 }}>
+            <div style={{ fontSize: 11, color: '#0f5132', marginBottom: 4 }}>Ready</div>
+            <div style={{ fontSize: 20, fontWeight: 'bold', color: '#198754' }}>{readyOrders}</div>
+          </div>
+          <div style={{ background: '#cfe2ff', border: '1px solid #0d6efd', borderRadius: 8, padding: 12 }}>
+            <div style={{ fontSize: 11, color: '#084298', marginBottom: 4 }}>Revenue Today</div>
+            <div style={{ fontSize: 18, fontWeight: 'bold', color: '#0d6efd' }}>₹{totalRevenue.toFixed(2)}</div>
+          </div>
+        </div>
+      )}
+
+      {isCustomer && (
         <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', padding: '8px 10px', borderRadius: 6, margin: '8px 0 12px' }}>
-          Pickup only: collect your order from the truck. Status “picked up” means it’s been handed over at the truck.
+          Pickup only: collect your order from the truck.
         </div>
       )}
       <table style={{ borderCollapse: 'collapse', width: '100%', fontFamily: 'system-ui' }}>
@@ -384,7 +436,7 @@ export default function Orders() {
               </>
             ) : (
               <>
-                <th style={th + (user?.role === 'staff' ? {} : {})} >{user?.role === 'staff' ? '' : 'Truck'}</th>
+                <th style={{ ...th }}>{user?.role === 'staff' ? '' : 'Truck'}</th>
                 <th style={th}>Status</th>
                 <th style={th}>Total</th>
                 <th style={th}>Details</th>

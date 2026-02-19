@@ -32,16 +32,14 @@ export default function Layout({ children }) {
   } else if (role === 'staff') {
     // Staff — Execution
     navLinks.push(
-      { to: '/staff', label: 'Staff Dashboard' },
-      { to: '/staff/stock', label: 'My Stock' },
-      { to: '/orders', label: 'Orders' }
+      { to: '/orders', label: 'My Orders' },
+      { to: '/staff/stock', label: 'My Stock' }
     );
   } else if (role === 'customer') {
     // Customer — Interaction
     navLinks.push(
       { to: '/trucks', label: 'Find Trucks' },
-      { to: '/orders', label: 'My Orders' },
-      { to: '/customer', label: 'Dashboard' }
+      { to: '/orders', label: 'My Orders' }
     );
   }
 

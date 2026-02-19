@@ -24,8 +24,8 @@ export default function Login() {
         const map = {
           admin: '/admin',
           manager: '/manager',
-          staff: '/staff',
-          customer: '/customer'
+          staff: '/orders',
+          customer: '/trucks'
         };
         navigate(map[role] || '/');
       } else {

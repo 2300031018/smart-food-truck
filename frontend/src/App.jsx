@@ -14,9 +14,7 @@ import AdminTrucks from './pages/AdminTrucks';
 import AdminOrders from './pages/AdminOrders';
 import DashboardManager from './pages/DashboardManager';
 import ManagerStaff from './pages/ManagerStaff';
-import DashboardStaff from './pages/DashboardStaff';
 import StaffStock from './pages/StaffStock';
-import DashboardCustomer from './pages/DashboardCustomer';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 function Protected({ children }) {
@@ -48,15 +46,9 @@ export default function App() {
           <Route path="/trucks/:id" element={<TruckDetail />} />
           <Route path="/trucks/:id/menu-manage" element={<RoleRoute roles={['admin', 'manager']}><MenuManage /></RoleRoute>} />
           <Route path="/admin" element={<RoleRoute roles={['admin']}><DashboardAdmin /></RoleRoute>} />
-          <Route path="/admin/trucks" element={<RoleRoute roles={['admin']}><AdminTrucks /></RoleRoute>} />
-          <Route path="/admin/managers" element={<RoleRoute roles={['admin']}><AdminManagers /></RoleRoute>} />
-          <Route path="/admin/staff" element={<RoleRoute roles={['admin']}><AdminStaff /></RoleRoute>} />
-          <Route path="/admin/orders" element={<RoleRoute roles={['admin']}><AdminOrders /></RoleRoute>} />
           <Route path="/manager" element={<RoleRoute roles={['manager']}><DashboardManager /></RoleRoute>} />
           <Route path="/manager/staff" element={<RoleRoute roles={['manager']}><ManagerStaff /></RoleRoute>} />
           <Route path="/staff/stock" element={<RoleRoute roles={['staff']}><StaffStock /></RoleRoute>} />
-          <Route path="/staff" element={<RoleRoute roles={['staff']}><DashboardStaff /></RoleRoute>} />
-          <Route path="/customer" element={<RoleRoute roles={['customer']}><DashboardCustomer /></RoleRoute>} />
           <Route path="/orders" element={<Protected><Orders /></Protected>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
