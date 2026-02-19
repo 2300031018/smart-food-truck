@@ -64,7 +64,7 @@ export default function DashboardManager() {
 
   function handleCreateSuccess(newTruck) {
     setTrucks(prev => [...prev, newTruck]);
-    setEditingTruck(newTruck);
+    // No longer opening RouteEditorModal here as it's part of the creation wizard
   }
 
   return (
@@ -145,7 +145,7 @@ export default function DashboardManager() {
         </div>
       </div>
 
-      <ManagerMenuPanel />
+      <ManagerMenuPanel trucks={trucks} />
 
       {editingDetails && (
         <TruckFormModal

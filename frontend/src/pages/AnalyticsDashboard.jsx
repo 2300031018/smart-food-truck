@@ -3,29 +3,42 @@ import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
 
-// Dashboard layout constants
-
 export default function AnalyticsDashboard() {
     const { token, user } = useAuth();
     const [summary, setSummary] = useState({ totalRevenue: 0, orderCount: 0, avgOrderValue: 0 });
-    const [lastUpdated, setLastUpdated] = useState(null);
     const [trend, setTrend] = useState(null);
     const [topItems, setTopItems] = useState(null);
     const [peakHours, setPeakHours] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [loadingTrucks, setLoadingTrucks] = useState(true);
     const [error, setError] = useState(null);
     const [days, setDays] = useState(30);
     const [selectedTruck, setSelectedTruck] = useState('');
     const [trucks, setTrucks] = useState([]);
 
+    // Fetch trucks separately to determine empty state quickly
     useEffect(() => {
-        if (user?.role === 'admin') {
-            api.getTrucks().then(res => {
-                if (res.success) setTrucks(res.data);
-            });
-        }
-    }, [user]);
+        if (!user || !token) return;
+        setLoadingTrucks(true);
+        const fetchTrucks = async () => {
+            try {
+                if (user.role === 'admin') {
+                    const res = await api.getTrucks();
+                    if (res.success) setTrucks(res.data);
+                } else if (user.role === 'manager') {
+                    const res = await api.getManagedTrucks(token);
+                    if (res.success) setTrucks(res.data);
+                }
+            } catch (err) {
+                console.error('Failed to fetch trucks', err);
+            } finally {
+                setLoadingTrucks(false);
+            }
+        };
+        fetchTrucks();
+    }, [user, token]);
 
+    // Fetch analytics data
     useEffect(() => {
         let mounted = true;
         setLoading(true);
@@ -36,11 +49,10 @@ export default function AnalyticsDashboard() {
         api.getAnalyticsSummary(token, params).then(res => {
             if (!mounted) return;
             if (res.success) {
-                setSummary(res.data.summary || {});
+                setSummary(res.data.summary || { totalRevenue: 0, orderCount: 0, avgOrderValue: 0 });
                 setTrend(res.data.charts?.salesTrend || null);
                 setTopItems(res.data.charts?.topItems || null);
                 setPeakHours(res.data.charts?.peakHours || null);
-                setLastUpdated(res.data.lastUpdated);
                 setError(null);
             }
         }).catch(err => {
@@ -52,38 +64,24 @@ export default function AnalyticsDashboard() {
         return () => { mounted = false; };
     }, [token, days, selectedTruck]);
 
-    if (loading && !trend) return <div style={{ padding: 20 }}>Fetching precomputed insights...</div>;
-    if (error) return (
-        <div style={{ padding: 20 }}>
-            <div style={{ color: '#ef4444', background: '#fee2e2', padding: 16, borderRadius: 8, border: '1px solid #fecaca' }}>
-                <strong>Analytics Unavailable:</strong> {error}
-            </div>
-            <p style={{ marginTop: 12, color: '#64748b' }}>The background engine might still be crunching the data. Please check back in a few minutes.</p>
-        </div>
-    );
+    if (!user) return <div style={{ padding: 20 }}>Please log in to view analytics.</div>;
 
+    // Main layout
     return (
         <div style={{ padding: '24px', fontFamily: 'system-ui', background: '#f8fafc', minHeight: '100vh' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <div>
-                    <h2 style={{ margin: 0, color: '#1e293b' }}>
-                        Analytics & Visualization <span style={{ fontSize: 13, fontWeight: 400, color: '#6366f1' }}>(Precomputed)</span>
-                    </h2>
-                    {lastUpdated && (
-                        <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
-                            Last updated: {new Date(lastUpdated).toLocaleString()}
-                        </div>
-                    )}
-                </div>
+                <h2 style={{ margin: 0, color: '#1e293b' }}>
+                    Analytics & Visualization <span style={{ fontSize: 13, fontWeight: 400, color: '#6366f1' }}>(Powered by Python)</span>
+                </h2>
 
                 <div style={{ display: 'flex', gap: 12 }}>
-                    {user?.role === 'admin' && (
+                    {(user.role === 'admin' || user.role === 'manager') && trucks.length > 0 && (
                         <select
                             value={selectedTruck}
                             onChange={e => setSelectedTruck(e.target.value)}
                             style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid #cbd5e1' }}
                         >
-                            <option value="">All Trucks</option>
+                            <option value="">{user.role === 'admin' ? 'All Trucks' : 'Select a Truck'}</option>
                             {trucks.map(t => (
                                 <option key={t.id || t._id} value={t.id || t._id}>{t.name}</option>
                             ))}
@@ -101,38 +99,64 @@ export default function AnalyticsDashboard() {
                 </div>
             </div>
 
-            {/* KPI Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20, marginBottom: 24 }}>
-                <Card title="Total Revenue" value={formatCurrency(summary.totalRevenue)} color="#6366f1" />
-                <Card title="Total Orders" value={summary.orderCount} color="#10b981" />
-                <Card title="Avg. Order Value" value={formatCurrency(summary.avgOrderValue)} color="#f59e0b" />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 24 }}>
-                {/* Revenue Trend */}
-                <div style={chartContainer}>
-                    <h4 style={chartTitle}>Revenue Trend</h4>
-                    {trend ? (
-                        <img src={`data:image/png;base64,${trend}`} alt="Sales Trend" style={{ width: '100%', borderRadius: 8 }} />
-                    ) : <div style={emptyChart}>No trend data available</div>}
+            {loadingTrucks ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Checking your food trucks...</div>
+            ) : user.role === 'manager' && trucks.length === 0 ? (
+                <div style={{ background: '#fff', padding: '60px 40px', borderRadius: 12, textAlign: 'center', border: '1px dashed #6366f1' }}>
+                    <div style={{ fontSize: 48, marginBottom: 16 }}>🚚</div>
+                    <h3 style={{ color: '#1e293b', marginBottom: 12 }}>Welcome to Analytics!</h3>
+                    <p style={{ color: '#64748b', maxWidth: 500, margin: '0 auto 24px' }}>
+                        You don't have any food trucks assigned to you yet. Once you create your first truck,
+                        real-time sales data and Python-powered insights will appear here.
+                    </p>
+                    <a href="/manager" style={{ background: '#6366f1', color: 'white', padding: '12px 24px', borderRadius: 8, textDecoration: 'none', fontWeight: 600, display: 'inline-block' }}>
+                        Create Your First Truck
+                    </a>
                 </div>
-
-                {/* Top Items */}
-                <div style={chartContainer}>
-                    <h4 style={chartTitle}>Top 5 Items (Revenue)</h4>
-                    {topItems ? (
-                        <img src={`data:image/png;base64,${topItems}`} alt="Top Items" style={{ width: '100%', borderRadius: 8 }} />
-                    ) : <div style={emptyChart}>No item data available</div>}
+            ) : error ? (
+                <div style={{ padding: 40, textAlign: 'center', background: '#fff1f2', color: '#be123c', borderRadius: 12, border: '1px solid #fda4af' }}>
+                    <h4>Unable to load analytics</h4>
+                    <p>{error}</p>
+                    <button onClick={() => window.location.reload()} style={{ marginTop: 12, padding: '8px 16px', borderRadius: 6, border: 'none', background: '#be123c', color: 'white', cursor: 'pointer' }}>Retry</button>
                 </div>
+            ) : (
+                <>
+                    {loading && <div style={{ marginBottom: 12, color: '#6366f1', fontSize: 13, fontWeight: 500 }}>Updating data science insights...</div>}
 
-                {/* Peak Hours */}
-                <div style={chartContainer}>
-                    <h4 style={chartTitle}>Peak Ordering Hours</h4>
-                    {peakHours ? (
-                        <img src={`data:image/png;base64,${peakHours}`} alt="Peak Hours" style={{ width: '100%', borderRadius: 8 }} />
-                    ) : <div style={emptyChart}>No activity data available</div>}
-                </div>
-            </div>
+                    {/* KPI Cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20, marginBottom: 24, opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
+                        <Card title="Total Revenue" value={formatCurrency(summary.totalRevenue)} color="#6366f1" />
+                        <Card title="Total Orders" value={summary.orderCount} color="#10b981" />
+                        <Card title="Avg. Order Value" value={formatCurrency(summary.avgOrderValue)} color="#f59e0b" />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 24, opacity: loading ? 0.6 : 1, transition: 'opacity 0.2s' }}>
+                        {/* Revenue Trend */}
+                        <div style={chartContainer}>
+                            <h4 style={chartTitle}>Revenue Trend</h4>
+                            {trend ? (
+                                <img src={`data:image/png;base64,${trend}`} alt="Sales Trend" style={{ width: '100%', borderRadius: 8 }} />
+                            ) : <div style={emptyChart}>{loading ? 'Calculating...' : 'No trend data available'}</div>}
+                        </div>
+
+                        {/* Top Items */}
+                        <div style={chartContainer}>
+                            <h4 style={chartTitle}>Top 5 Items (Revenue)</h4>
+                            {topItems ? (
+                                <img src={`data:image/png;base64,${topItems}`} alt="Top Items" style={{ width: '100%', borderRadius: 8 }} />
+                            ) : <div style={emptyChart}>{loading ? 'Calculating...' : 'No item data available'}</div>}
+                        </div>
+
+                        {/* Peak Hours */}
+                        <div style={chartContainer}>
+                            <h4 style={chartTitle}>Peak Ordering Hours</h4>
+                            {peakHours ? (
+                                <img src={`data:image/png;base64,${peakHours}`} alt="Peak Hours" style={{ width: '100%', borderRadius: 8 }} />
+                            ) : <div style={emptyChart}>{loading ? 'Calculating...' : 'No activity data available'}</div>}
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }

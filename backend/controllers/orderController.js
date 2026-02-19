@@ -126,16 +126,18 @@ exports.getOrders = asyncHandler(async (req, res) => {
   } else if (req.user.role === 'staff') {
     // staff strictly limited to their single assignedTruck
     if (!req.user.assignedTruck) {
-      baseQuery.truck = '__none__';
-    } else {
-      baseQuery.truck = req.user.assignedTruck;
+      return res.json({ success: true, data: [] });
     }
+    baseQuery.truck = req.user.assignedTruck;
   } else { // manager
     const trucks = await Truck.find({ manager: req.user.id }).select('_id');
     const ids = trucks.map(t => t._id);
-    baseQuery.truck = { $in: ids.length ? ids : ['__none__'] };
+    if (ids.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+    baseQuery.truck = { $in: ids };
   }
-  const orders = await Order.find(baseQuery).sort({ createdAt: -1 });
+  const orders = await Order.find(baseQuery).sort({ createdAt: -1 }).lean();
   orders.forEach(o => normalizeOrderRecord(o));
   res.json({ success: true, data: orders });
 });

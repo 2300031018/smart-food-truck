@@ -1,44 +1,38 @@
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { api } from '../../api/client';
 import MenuManager from '../menu/MenuManager';
 
-export default function ManagerMenuPanel(){
-  const { token } = useAuth();
-  const [trucks, setTrucks] = useState([]);
+export default function ManagerMenuPanel({ trucks = [] }) {
   const [selected, setSelected] = useState('');
-  const [loading, setLoading] = useState(true);
 
-  useEffect(()=>{
-    let mounted = true;
-    async function load(){
-      setLoading(true);
-      try {
-        const d = await api.getManagedTrucks(token);
-        if (mounted && d?.success) {
-          setTrucks(d.data || []);
-          if (d.data?.length && !selected) setSelected(d.data[0]._id || d.data[0].id);
-        }
-      } finally { if (mounted) setLoading(false); }
+  // Sync selected truck when trucks list changes
+  useEffect(() => {
+    if (trucks.length > 0) {
+      // If none selected, or selected truck no longer exists, pick the first one
+      const stillExists = trucks.find(t => (t._id || t.id) === selected);
+      if (!selected || !stillExists) {
+        setSelected(trucks[0]._id || trucks[0].id);
+      }
+    } else {
+      setSelected('');
     }
-    if (token) load();
-    return () => { mounted = false; };
-  }, [token]);
+  }, [trucks, selected]);
 
   return (
-    <section style={{ marginTop:24 }}>
+    <section style={{ marginTop: 24 }}>
       <h3>Manage Menu</h3>
-      {loading ? (
-        <p>Loading trucks…</p>
-      ) : trucks.length === 0 ? (
+      {trucks.length === 0 ? (
         <p>No trucks assigned to you yet.</p>
       ) : (
         <>
-          <div style={{ marginBottom:12 }}>
+          <div style={{ marginBottom: 12 }}>
             <label>
               Truck:
-              <select value={selected} onChange={e=> setSelected(e.target.value)} style={{ marginLeft:6 }}>
-                {trucks.map(t => <option key={t._id || t.id} value={t._id || t.id}>{t.name}</option>)}
+              <select value={selected} onChange={e => setSelected(e.target.value)} style={{ marginLeft: 6 }}>
+                {trucks.map(t => (
+                  <option key={t._id || t.id} value={t._id || t.id}>
+                    {t.name}
+                  </option>
+                ))}
               </select>
             </label>
           </div>

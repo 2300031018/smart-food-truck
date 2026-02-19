@@ -252,7 +252,7 @@ exports.unassignManager = asyncHandler(async (req, res) => {
 exports.getTruckStaff = asyncHandler(async (req, res) => {
   const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role').populate('staff', 'id email name role staffRole');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
-  if (req.user.role === 'manager' && truck.manager && truck.manager.id !== req.user.id) {
+  if (req.user.role === 'manager' && truck.manager && String(truck.manager.id || truck.manager._id || truck.manager) !== String(req.user.id)) {
     return res.status(403).json({ success: false, error: { message: 'Not manager of this truck' } });
   }
   if (req.user.role !== 'admin' && req.user.role !== 'manager') {
@@ -266,7 +266,7 @@ exports.assignStaff = asyncHandler(async (req, res) => {
   if (!userId) return res.status(422).json({ success: false, error: { message: 'userId required' } });
   const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
-  if (req.user.role === 'manager' && truck.manager && truck.manager.id !== req.user.id) {
+  if (req.user.role === 'manager' && truck.manager && String(truck.manager.id || truck.manager._id || truck.manager) !== String(req.user.id)) {
     return res.status(403).json({ success: false, error: { message: 'Not manager of this truck' } });
   }
   const staffUser = await User.findById(userId);
@@ -292,7 +292,7 @@ exports.unassignStaff = asyncHandler(async (req, res) => {
   const { id: truckId, userId } = { id: req.params.id, userId: req.params.userId };
   const truck = await Truck.findById(truckId).populate('manager', 'id email name role');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
-  if (req.user.role === 'manager' && truck.manager && truck.manager.id !== req.user.id) {
+  if (req.user.role === 'manager' && truck.manager && String(truck.manager.id || truck.manager._id || truck.manager) !== String(req.user.id)) {
     return res.status(403).json({ success: false, error: { message: 'Not manager of this truck' } });
   }
   const staffUser = await User.findById(userId);
@@ -316,7 +316,7 @@ exports.updateRoutePlan = asyncHandler(async (req, res) => {
   const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
   if (req.user.role === 'manager') {
-    if (!truck.manager || truck.manager.id !== req.user.id) {
+    if (!truck.manager || String(truck.manager.id || truck.manager._id || truck.manager) !== String(req.user.id)) {
       return res.status(403).json({ success: false, error: { message: 'Not manager of this truck' } });
     }
   } else if (req.user.role !== 'admin') {
@@ -341,7 +341,7 @@ exports.updateStatusLocation = asyncHandler(async (req, res) => {
   const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
   if (req.user.role === 'manager') {
-    if (!truck.manager || truck.manager.id !== req.user.id) {
+    if (!truck.manager || String(truck.manager.id || truck.manager._id || truck.manager) !== String(req.user.id)) {
       return res.status(403).json({ success: false, error: { message: 'Not manager of this truck' } });
     }
   } else if (req.user.role !== 'admin') {
@@ -373,7 +373,7 @@ exports.startRoute = asyncHandler(async (req, res) => {
   const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
   if (req.user.role === 'manager') {
-    if (!truck.manager || truck.manager.id !== req.user.id) {
+    if (!truck.manager || String(truck.manager.id || truck.manager._id || truck.manager) !== String(req.user.id)) {
       return res.status(403).json({ success: false, error: { message: 'Not manager of this truck' } });
     }
   } else if (req.user.role !== 'admin') {
@@ -398,7 +398,7 @@ exports.advanceRoute = asyncHandler(async (req, res) => {
   const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
   if (req.user.role === 'manager') {
-    if (!truck.manager || truck.manager.id !== req.user.id) {
+    if (!truck.manager || String(truck.manager.id || truck.manager._id || truck.manager) !== String(req.user.id)) {
       return res.status(403).json({ success: false, error: { message: 'Not manager of this truck' } });
     }
   } else if (req.user.role !== 'admin') {
@@ -437,7 +437,7 @@ exports.stopRoute = asyncHandler(async (req, res) => {
   const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
   if (req.user.role === 'manager') {
-    if (!truck.manager || truck.manager.id !== req.user.id) {
+    if (!truck.manager || String(truck.manager.id || truck.manager._id || truck.manager) !== String(req.user.id)) {
       return res.status(403).json({ success: false, error: { message: 'Not manager of this truck' } });
     }
   } else if (req.user.role !== 'admin') {
@@ -455,12 +455,13 @@ exports.forceAllServing = asyncHandler(async (req, res) => {
 });
 
 exports.deleteTruck = asyncHandler(async (req, res) => {
-  const truck = await Truck.findById(req.params.id).populate('manager', 'id _id');
+  const truck = await Truck.findById(req.params.id);
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
 
   if (req.user.role === 'manager') {
-    const mgrId = truck.manager ? (truck.manager.id || String(truck.manager._id)) : null;
-    if (!mgrId || mgrId !== String(req.user.id)) return res.status(403).json({ success: false, error: { message: 'Not manager of this truck' } });
+    if (String(truck.manager) !== String(req.user.id)) {
+      return res.status(403).json({ success: false, error: { message: 'Not manager of this truck (delete)' } });
+    }
   } else if (req.user.role !== 'admin') {
     return res.status(403).json({ success: false, error: { message: 'Forbidden' } });
   }
