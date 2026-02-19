@@ -6,7 +6,6 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
-const { initCache } = require('./utils/cache');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -15,7 +14,6 @@ if (!process.env.MONGO_URI) {
 }
 
 connectDB();
-initCache();
 
 const security = require('./config/security');
 const app = express();
@@ -37,9 +35,9 @@ app.use('/api/trucks', require('./routes/trucks'));
 app.use('/api/menu', require('./routes/menu'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/orders', require('./routes/orders'));
-app.use('/api/chats', require('./routes/chats'));
 app.use('/api/health', require('./routes/health'));
 app.use('/api/forecast', require('./routes/forecast'));
+app.use('/api/recommendations', require('./routes/recommendations'));
 
 // Not found handler
 const notFound = require('./middleware/notFound');

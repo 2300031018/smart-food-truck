@@ -98,10 +98,6 @@ function emitOrderUpdate(order, meta = {}) {
   io.to('orders:admin').emit('order:update', payload);
 }
 
-function emitChatMessage(roomId, message) {
-  if (!io) return;
-  io.to(`chat:${roomId}`).emit('chat:message', message);
-}
 
 function emitTruckUpdate(truckId, data) {
   if (!io) return;
@@ -115,4 +111,4 @@ function emitTruckDeleted(truckId) {
   io.emit('truck:deleted', { truckId: id });
 }
 
-module.exports = { initSocket, emitTruckLocation, emitOrderCreated, emitOrderUpdate, emitChatMessage, emitTruckUpdate, emitTruckDeleted };
+module.exports = { initSocket, emitTruckLocation, emitOrderCreated, emitOrderUpdate, emitTruckUpdate, emitTruckDeleted };

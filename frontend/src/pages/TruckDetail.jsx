@@ -3,8 +3,6 @@ import { formatCurrency } from '../utils/currency';
 import { useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { chatApi } from '../api/chat';
-import ChatDrawer from '../components/ChatDrawer';
 import MapEmbed from '../components/MapEmbed';
 import { useSocketRooms } from '../hooks/useSocketRooms';
 
@@ -12,25 +10,24 @@ export default function TruckDetail() {
   const { id } = useParams();
   const { token, user } = useAuth();
   const [truck, setTruck] = useState(null);
-  const [menu, setMenu] = useState([]);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [chatOpen, setChatOpen] = useState(false);
   const [locBusy, setLocBusy] = useState(false);
   const [locError, setLocError] = useState(null);
   const [autoUpdate, setAutoUpdate] = useState(false);
   const [locForm, setLocForm] = useState({ lat: '', lng: '' });
+  const [recs, setRecs] = useState([]);
   const watchIdRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;
     Promise.all([
       api.getTruck(id),
-      api.getMenuItems(id)
-    ]).then(([truckRes, menuRes]) => {
+      api.getMenuItems(id),
+      api.getRecommendations(id)
+    ]).then(([truckRes, menuRes, recRes]) => {
       if (mounted) {
         if (truckRes.success) setTruck(truckRes.data);
         if (menuRes.success) setMenu(menuRes.data);
+        if (recRes.success) setRecs(recRes.data);
       }
     }).catch(err => setError(err.message))
       .finally(() => setLoading(false));
@@ -74,7 +71,6 @@ export default function TruckDetail() {
 
   const isManagerOfTruck = token && user?.role === 'manager' && truck?.manager && (truck.manager.id === user.id || truck.manager.id === user._id);
   const canManageMenu = token && (user?.role === 'admin' || isManagerOfTruck);
-  const canTruckChat = token && (user?.role === 'admin' || user?.role === 'manager' || user?.role === 'staff');
   const canUpdateLocation = token && (user?.role === 'admin' || isManagerOfTruck);
 
   async function sendLiveLocation(lat, lng) {
@@ -134,11 +130,23 @@ export default function TruckDetail() {
         <a href="#menu-section" style={{ textDecoration: 'none' }}>
           <button type="button">View Menu</button>
         </a>
-        {canTruckChat && (
-          <button onClick={() => setChatOpen(true)}>Truck Chat</button>
-        )}
       </div>
       <p>{truck.description}</p>
+
+      {recs.length > 0 && (
+        <div style={{ margin: '15px 0', padding: 12, background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 8 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6, color: '#5b21b6' }}>
+            <span>✨</span> Popular Pairings
+          </div>
+          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+            {recs.map((r, i) => (
+              <div key={i} style={{ flexShrink: 0, padding: '6px 12px', background: '#fff', border: '1px solid #e9d5ff', borderRadius: 20, fontSize: 13, color: '#6d28d9', fontWeight: 500 }}>
+                {r.name}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {canUpdateLocation && (
         <div style={{ margin: '8px 0 12px', padding: 12, border: '1px solid #e5e7eb', borderRadius: 6, background: '#f9fafb' }}>
           <div style={{ marginBottom: 6, fontWeight: 600 }}>Live Location</div>
@@ -181,12 +189,6 @@ export default function TruckDetail() {
       {canManageMenu && (
         <a href={`/trucks/${id}/menu-manage`} style={{ display: 'inline-block', marginTop: 12 }}>Manage Menu</a>
       )}
-      <ChatDrawer
-        open={chatOpen}
-        onClose={() => setChatOpen(false)}
-        title={`Truck Chat · ${truck.name}`}
-        roomResolver={(tok) => chatApi.getTruckRoom(tok, id)}
-      />
     </div>
   );
 }

@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
-import { chatApi } from '../api/chat';
-import ChatDrawer from '../components/ChatDrawer';
 import { useSocketRooms } from '../hooks/useSocketRooms';
 import { useLiveEta } from '../hooks/useLiveEta';
 
@@ -18,8 +16,7 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 }
 
 function estimateTravelMinutes(distanceKm, mode) {
-  // Rough city averages
-  const speeds = { walking: 4.5, driving: 25, cycling: 12 };// km/h
+  const speeds = { walking: 4.5, driving: 25, cycling: 12 };
   const speed = speeds[mode] || speeds.driving;
   const hours = distanceKm / speed;
   return Math.max(1, Math.round(hours * 60));
@@ -48,22 +45,18 @@ function PickupPlanner({ order, coords, defaultPrep = 20 }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
 
-  // ETA estimate using local distance calculation
   const live = useLiveEta({
     origin: myPos,
     destination: coords,
     mode: mode.toUpperCase()
   });
 
-  // Fallback ETA when estimate not ready
   useEffect(() => {
     if (!myPos || !coords) { setEtaMin(null); return; }
-    // Prefer estimate when ok
     if (live.status === 'ok' && typeof live.minutes === 'number') {
       setEtaMin(live.minutes);
       return;
     }
-    // Fallback rough estimate
     const d = haversineKm(myPos.lat, myPos.lng, coords.lat, coords.lng);
     setEtaMin(estimateTravelMinutes(d, mode));
   }, [myPos, coords?.lat, coords?.lng, mode, live.status, live.minutes]);
@@ -79,7 +72,6 @@ function PickupPlanner({ order, coords, defaultPrep = 20 }) {
 
   const suggestion = (() => {
     if (!etaMin) return null;
-    // If order is already ready, advise to start now
     if (normalizeOrderStatus(order.status) === 'READY') return 'Order is ready — start now to pick up.';
     const diff = prepMin - etaMin;
     if (diff > 0) return `Leave in ~${diff} min to arrive when it’s ready.`;
@@ -143,14 +135,11 @@ export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatOrder, setChatOrder] = useState(null);
-  const [truckNames, setTruckNames] = useState({}); // id -> name
-  const [trucksById, setTrucksById] = useState({}); // id -> truck object
-  const [expandedOrders, setExpandedOrders] = useState(new Set()); // expanded order IDs
-  const prevStatusRef = useRef({}); // orderId -> status
-  const notifiedRef = useRef(new Set()); // orderIds already notified for 'ready'
-  const pollTimerRef = useRef(null);
+  const [truckNames, setTruckNames] = useState({});
+  const [trucksById, setTrucksById] = useState({});
+  const [expandedOrders, setExpandedOrders] = useState(new Set());
+  const prevStatusRef = useRef({});
+  const notifiedRef = useRef(new Set());
 
   useEffect(() => {
     let mounted = true;
@@ -162,8 +151,6 @@ export default function Orders() {
       .then(async ([ordersRes, trucksRes]) => {
         if (!mounted) return;
         let filteredOrders = ordersRes.data || [];
-
-        // Filter orders if staff is assigned to a specific truck
         if (user?.role === 'staff' && user?.assignedTruck) {
           const assignedTruckId = user.assignedTruck;
           filteredOrders = filteredOrders.filter(o => {
@@ -171,7 +158,6 @@ export default function Orders() {
             return tid === assignedTruckId;
           });
         }
-
         if (ordersRes.success) {
           setOrders(filteredOrders);
           const map = {};
@@ -183,7 +169,6 @@ export default function Orders() {
         if (trucksRes.success) {
           (trucksRes.data || []).forEach(t => { const key = t.id || t._id; nameMap[key] = t.name; byId[key] = t; });
         }
-        // Ensure we have truck details for any truck referenced by orders but missing from list
         if (ordersRes.success) {
           const missingIds = new Set();
           for (const o of filteredOrders) {
@@ -207,7 +192,6 @@ export default function Orders() {
     return () => { mounted = false; };
   }, [token, user]);
 
-  // Request browser notification permission once for customers
   useEffect(() => {
     if (user?.role !== 'customer') return;
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -216,8 +200,6 @@ export default function Orders() {
       }
     }
   }, [user]);
-
-  // Removed polling; websocket updates drive status changes and we still fetch initial data above
 
   const trackedTruckIds = useMemo(() => {
     const ids = new Set();
@@ -339,11 +321,6 @@ export default function Orders() {
     }
   }
 
-  function openChat(order) {
-    setChatOrder(order);
-    setChatOpen(true);
-  }
-
   function toggleExpand(orderId) {
     const newSet = new Set(expandedOrders);
     if (newSet.has(orderId)) {
@@ -364,16 +341,6 @@ export default function Orders() {
     if (typeof o.truck === 'string') return truckNames[o.truck] || shortId(o.truck);
     return '—';
   }
-  function directionsUrl(o) {
-    const t = getTruckObj(o);
-    const live = t?.liveLocation; const base = t?.location;
-    const lat = typeof live?.lat === 'number' ? live.lat : (typeof base?.lat === 'number' ? base.lat : null);
-    const lng = typeof live?.lng === 'number' ? live.lng : (typeof base?.lng === 'number' ? base.lng : null);
-    if (lat !== null && lng !== null) {
-      return `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}`;
-    }
-    return null;
-  }
   function coords(o) {
     const t = getTruckObj(o);
     const live = t?.liveLocation; const base = t?.location;
@@ -381,24 +348,15 @@ export default function Orders() {
     const lng = typeof live?.lng === 'number' ? live.lng : (typeof base?.lng === 'number' ? base.lng : null);
     return (lat !== null && lng !== null) ? { lat, lng } : null;
   }
-
   function prepDefault(o) {
     const candidates = [o.estimatedPrepMinutes, o.prepMinutes, o.prepTimeMin, o.prepTime];
     for (const c of candidates) { if (typeof c === 'number' && c > 0) return c; }
-    return 20; // fallback
+    return 20;
   }
-
   function displayStatus(status) {
     const key = normalizeOrderStatus(status);
     if (user?.role !== 'customer') return key || status;
-    const map = {
-      PLACED: 'placed',
-      ACCEPTED: 'accepted',
-      PREPARING: 'preparing',
-      READY: 'ready for pickup',
-      COMPLETED: 'picked up',
-      CANCELLED: 'cancelled'
-    };
+    const map = { PLACED: 'placed', ACCEPTED: 'accepted', PREPARING: 'preparing', READY: 'ready for pickup', COMPLETED: 'picked up', CANCELLED: 'cancelled' };
     return map[key] || key || status;
   }
 
@@ -424,16 +382,9 @@ export default function Orders() {
                 <th style={th}>Total</th>
                 <th style={th}>Pickup</th>
               </>
-            ) : user?.role === 'staff' ? (
-              <>
-                <th style={th}>Status</th>
-                <th style={th}>Total</th>
-                <th style={th}>Details</th>
-                <th style={th}>Action</th>
-              </>
             ) : (
               <>
-                <th style={th}>Truck</th>
+                <th style={th + (user?.role === 'staff' ? {} : {})} >{user?.role === 'staff' ? '' : 'Truck'}</th>
                 <th style={th}>Status</th>
                 <th style={th}>Total</th>
                 <th style={th}>Details</th>
@@ -445,113 +396,50 @@ export default function Orders() {
         <tbody>
           {orders.map(o => {
             const isExpanded = expandedOrders.has(o._id);
+            const isStaff = user?.role === 'staff';
+            const tid = getTruckId(o);
             return (
               <React.Fragment key={o._id}>
                 <tr style={{ borderBottom: '1px solid #ddd' }}>
                   <td style={td}>
-                    <div><span title={o._id}>{orderCode(o)}</span></div>
+                    <div><span>{orderCode(o)}</span></div>
                     <div style={{ fontSize: 11, opacity: .7 }}>Pickup Code: <strong>{pickupCode(o)}</strong></div>
                   </td>
-                  {user?.role === 'customer' && (
-                    <td style={td}>{truckLabel(o)}</td>
-                  )}
-                  {user?.role === 'staff' ? (
-                    <>
-                      <td style={td}>{displayStatus(o.status)}</td>
-                      <td style={td}>{formatCurrency(o.total || 0)}</td>
-                      <td style={td}>
-                        <button onClick={() => toggleExpand(o._id)} style={{ marginBottom: isExpanded ? 6 : 0 }}>
-                          {isExpanded ? '▼ Hide Details' : '▶ View Details'}
-                        </button>
-                      </td>
-                      <td style={td}>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          {['manager', 'staff', 'admin'].includes(user.role) && (
-                            <button
-                              onClick={() => advanceStatus(o)}
-                              disabled={!getNextStatus(o.status) || ['CANCELLED', 'COMPLETED'].includes(normalizeOrderStatus(o.status))}
-                            >
-                              Next
-                            </button>
-                          )}
-                          {token && (
-                            <button onClick={() => openChat(o)}>Chat</button>
-                          )}
-                        </div>
-                      </td>
-                    </>
-                  ) : user?.role === 'customer' ? (
-                    <>
-                      <td style={td}>{displayStatus(o.status)}</td>
-                      <td style={td}>{formatCurrency(o.total || 0)}</td>
-                      <td style={td}>
-                        <div>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
-                            <Link to={`/trucks/${getTruckId(o)}`} style={{ textDecoration: 'none' }}>
-                              <button type="button">View Truck</button>
-                            </Link>
-                            {token && <button onClick={() => openChat(o)}>Chat</button>}
-                          </div>
-                          <PickupPlanner order={o} coords={coords(o)} defaultPrep={prepDefault(o)} />
-                        </div>
-                      </td>
-                    </>
+                  {!isStaff && user?.role !== 'customer' && <td style={td}>{truckLabel(o)}</td>}
+                  {user?.role === 'customer' && <td style={td}>{truckLabel(o)}</td>}
+                  <td style={td}>{displayStatus(o.status)}</td>
+                  <td style={td}>{formatCurrency(o.total || 0)}</td>
+                  {user?.role === 'customer' ? (
+                    <td style={td}>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                        <Link to={`/trucks/${tid}`} style={{ textDecoration: 'none' }}>
+                          <button type="button">View Truck</button>
+                        </Link>
+                      </div>
+                      <PickupPlanner order={o} coords={coords(o)} defaultPrep={prepDefault(o)} />
+                    </td>
                   ) : (
                     <>
-                      <td style={td}>{truckLabel(o)}</td>
-                      <td style={td}>{displayStatus(o.status)}</td>
-                      <td style={td}>{formatCurrency(o.total || 0)}</td>
                       <td style={td}>
-                        <button onClick={() => toggleExpand(o._id)} style={{ marginBottom: isExpanded ? 6 : 0 }}>
-                          {isExpanded ? '▼ Hide Details' : '▶ View Details'}
-                        </button>
+                        <button onClick={() => toggleExpand(o._id)}>{isExpanded ? 'Hide' : 'View'}</button>
                       </td>
                       <td style={td}>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          {['manager', 'staff', 'admin'].includes(user.role) && (
-                            <button
-                              onClick={() => advanceStatus(o)}
-                              disabled={!getNextStatus(o.status) || ['CANCELLED', 'COMPLETED'].includes(normalizeOrderStatus(o.status))}
-                            >
-                              Next
-                            </button>
-                          )}
-                          {token && (
-                            <button onClick={() => openChat(o)}>Chat</button>
-                          )}
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => advanceStatus(o)} disabled={!getNextStatus(o.status)}>Next</button>
                         </div>
                       </td>
                     </>
                   )}
                 </tr>
-                {isExpanded && user?.role !== 'customer' && (
-                  <tr style={{ borderBottom: '1px solid #ddd', background: '#f9fafb' }}>
-                    <td colSpan={user?.role === 'staff' ? 5 : 6} style={{ ...td, paddingTop: 12, paddingBottom: 12 }}>
-                      <div style={{ display: 'grid', gap: 12 }}>
-                        {/* Items section */}
-                        <div>
-                          <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Items Ordered:</h4>
-                          {o.items && o.items.length > 0 ? (
-                            <ul style={{ margin: '0 0 0 16px', padding: 0 }}>
-                              {o.items.map((item, idx) => (
-                                <li key={idx} style={{ marginBottom: 4, fontSize: 13 }}>
-                                  <strong>{item.name}</strong> x {item.quantity} @ ₹{Number(item.unitPrice).toFixed(2)} = ₹{Number(item.lineTotal).toFixed(2)}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p style={{ margin: 0, fontSize: 13, opacity: 0.7 }}>No items</p>
-                          )}
-                        </div>
-                        {/* Notes section */}
-                        {o.notes && (
-                          <div>
-                            <h4 style={{ margin: '0 0 8px 0', fontSize: 13 }}>Customer Notes:</h4>
-                            <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 4, padding: 8, fontSize: 13 }}>
-                              {o.notes}
-                            </div>
-                          </div>
-                        )}
+                {isExpanded && (
+                  <tr>
+                    <td colSpan={6} style={{ padding: 10, background: '#f9fafb' }}>
+                      <div style={{ fontSize: 13 }}>
+                        <strong>Items:</strong>
+                        <ul style={{ margin: '5px 0' }}>
+                          {o.items?.map((it, idx) => <li key={idx}>{it.name} x {it.quantity}</li>)}
+                        </ul>
+                        {o.notes && <div><strong>Notes:</strong> {o.notes}</div>}
                       </div>
                     </td>
                   </tr>
@@ -561,13 +449,6 @@ export default function Orders() {
           })}
         </tbody>
       </table>
-
-      <ChatDrawer
-        open={chatOpen}
-        onClose={() => setChatOpen(false)}
-        title={chatOrder ? `Order Chat · ${chatOrder._id.slice(-6)}` : 'Order Chat'}
-        roomResolver={(tok) => chatOrder ? chatApi.getOrderRoom(tok, chatOrder._id) : null}
-      />
     </div>
   );
 }

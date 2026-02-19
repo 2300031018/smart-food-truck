@@ -64,6 +64,10 @@ export const api = {
   advanceTruckRoute: (token, id) => request(`/trucks/${id}/advance-route`, { method: 'POST', token }),
   stopTruckRoute: (token, id) => request(`/trucks/${id}/stop-route`, { method: 'POST', token }),
   deleteTruck: (token, id) => request(`/trucks/${id}`, { method: 'DELETE', token }),
+  getRecommendations: (truckId, currentItems = []) => {
+    const qs = currentItems.length > 0 ? `?items=${currentItems.join(',')}` : '';
+    return request(`/recommendations/truck/${truckId}${qs}`);
+  },
 
   getMenuItems: (truckId, { group } = {}) => {
     const qs = group ? `?group=${encodeURIComponent(group)}` : '';
