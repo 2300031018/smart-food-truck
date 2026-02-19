@@ -15,6 +15,9 @@ export default function TruckDetail() {
   const [autoUpdate, setAutoUpdate] = useState(false);
   const [locForm, setLocForm] = useState({ lat: '', lng: '' });
   const [recs, setRecs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [menu, setMenu] = useState([]);
   const watchIdRef = useRef(null);
 
   useEffect(() => {
