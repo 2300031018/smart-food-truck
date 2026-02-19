@@ -1,5 +1,5 @@
 const Truck = require('../models/Truck');
-const { emitTruckLocation } = require('../socket');
+const { emitTruckLocation, emitTruckUpdate } = require('../socket');
 
 const SPEED_KMH = 20;
 const DEFAULT_UPDATE_MS = 5000;
@@ -49,7 +49,7 @@ function normalizeStops(routePlan) {
       name: String(s?.name || '').trim(),
       lat: Number(s?.lat),
       lng: Number(s?.lng),
-      stayMin: Math.max(0, Number.isFinite(Number(s?.stayMin)) ? Number(s.stayMin) : 15)
+      waitTime: Math.max(0, Number.isFinite(Number(s?.waitTime)) ? Number(s.waitTime) : 15)
     }))
     .filter(s => s.name && Number.isFinite(s.lat) && Number.isFinite(s.lng));
 }
@@ -59,7 +59,7 @@ function ensureLoopStops(stops) {
   const first = stops[0];
   const last = stops[stops.length - 1];
   const same = Math.abs(first.lat - last.lat) < 1e-6 && Math.abs(first.lng - last.lng) < 1e-6;
-  return same ? stops : [...stops, { ...first, stayMin: Math.max(0, Number.isFinite(Number(first.stayMin)) ? Number(first.stayMin) : 15) }];
+  return same ? stops : [...stops, { ...first, waitTime: Math.max(0, Number.isFinite(Number(first.waitTime)) ? Number(first.waitTime) : 15) }];
 }
 
 function computePlannedLocation(routePlan, now = new Date()) {
@@ -74,6 +74,7 @@ function computePlannedLocation(routePlan, now = new Date()) {
     return { lat: stops[0].lat, lng: stops[0].lng, status: 'SERVING', currentStopIndex: 0 };
   }
 
+  // If outside daily window, default to first stop
   if (nowMin < startMin || nowMin > endMin) {
     return { lat: stops[0].lat, lng: stops[0].lng, status: 'SERVING', currentStopIndex: 0 };
   }
@@ -82,7 +83,7 @@ function computePlannedLocation(routePlan, now = new Date()) {
   for (let i = 0; i < stops.length - 1; i += 1) {
     const a = stops[i];
     const b = stops[i + 1];
-    segments.push({ type: 'stay', stop: a, stopIndex: i, duration: Math.max(0, Number(a.stayMin ?? 15)) });
+    segments.push({ type: 'stay', stop: a, stopIndex: i, duration: Math.max(0, Number(a.waitTime ?? 15)) });
     const distanceKm = haversineMeters(a.lat, a.lng, b.lat, b.lng) / 1000;
     const travelMin = Math.max(0.1, (distanceKm / SPEED_KMH) * 60);
     segments.push({ type: 'travel', from: a, to: b, fromIndex: i, toIndex: i + 1, duration: travelMin });
@@ -120,7 +121,7 @@ async function updateTruckLocations() {
   const now = new Date();
   const trucks = await Truck.find({
     isActive: true,
-    status: { $in: ['active', 'en_route'] },
+    status: { $in: ['SERVING', 'MOVING'] },
     'routePlan.stops.0': { $exists: true }
   }).select('routePlan liveLocation status currentStopIndex');
 
@@ -143,7 +144,11 @@ async function updateTruckLocations() {
     truck.status = pos.status;
     truck.currentStopIndex = pos.currentStopIndex;
     await truck.save();
-    try { emitTruckLocation(truck.id, truck.liveLocation, truck.status, truck.currentStopIndex); } catch { }
+    try {
+      const updateData = { liveLocation: truck.liveLocation, status: truck.status, currentStopIndex: truck.currentStopIndex };
+      emitTruckLocation(truck.id, truck.liveLocation, truck.status, truck.currentStopIndex);
+      emitTruckUpdate(truck.id, updateData);
+    } catch { }
   }
 }
 
