@@ -36,18 +36,16 @@ export default function AnalyticsDashboard() {
         const params = { days };
         if (selectedTruck) params.truckId = selectedTruck;
 
-        Promise.all([
-            api.getAnalyticsSummary(token, params),
-            api.getSalesTrend(token, params),
-            api.getTopItems(token, params),
-            api.getPeakHours(token, params)
-        ]).then(([sumRes, trendRes, topRes, peakRes]) => {
+        // Use a single call to the combined analytics endpoint
+        api.getAnalyticsSummary(token, params).then(res => {
             if (!mounted) return;
-            if (sumRes.success) setSummary(sumRes.data);
-            if (trendRes.success) setTrend(trendRes.data);
-            if (topRes.success) setTopItems(topRes.data);
-            if (peakRes.success) setPeakHours(peakRes.data);
-            setError(null);
+            if (res.success) {
+                setSummary(res.data.summary || {});
+                setTrend(res.data.charts?.salesTrend || null);
+                setTopItems(res.data.charts?.topItems || null);
+                setPeakHours(res.data.charts?.peakHours || null);
+                setError(null);
+            }
         }).catch(err => {
             if (mounted) setError(err.message || 'Failed to load analytics');
         }).finally(() => {
@@ -57,13 +55,15 @@ export default function AnalyticsDashboard() {
         return () => { mounted = false; };
     }, [token, days, selectedTruck]);
 
-    if (loading && trend.length === 0) return <div style={{ padding: 20 }}>Gathering insights...</div>;
+    if (loading && !trend) return <div style={{ padding: 20 }}>Gathering data science insights...</div>;
     if (error) return <div style={{ padding: 20, color: 'red' }}>Error: {error}</div>;
 
     return (
         <div style={{ padding: '24px', fontFamily: 'system-ui', background: '#f8fafc', minHeight: '100vh' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <h2 style={{ margin: 0, color: '#1e293b' }}>Analytics Dashboard</h2>
+                <h2 style={{ margin: 0, color: '#1e293b' }}>
+                    Analytics & Visualization <span style={{ fontSize: 13, fontWeight: 400, color: '#6366f1' }}>(Powered by Python)</span>
+                </h2>
 
                 <div style={{ display: 'flex', gap: 12 }}>
                     {user?.role === 'admin' && (
@@ -101,90 +101,32 @@ export default function AnalyticsDashboard() {
                 {/* Revenue Trend */}
                 <div style={chartContainer}>
                     <h4 style={chartTitle}>Revenue Trend</h4>
-                    <div style={{ height: 300 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={trend}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey="_id" stroke="#64748b" fontSize={12} tickFormatter={(val) => val.split('-').slice(1).join('/')} />
-                                <YAxis stroke="#64748b" fontSize={12} tickFormatter={(val) => `$${val}`} />
-                                <Tooltip
-                                    formatter={(value) => [formatCurrency(value), 'Revenue']}
-                                    contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                />
-                                <Line type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={3} dot={{ r: 4, fill: '#6366f1' }} activeDot={{ r: 6 }} />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
+                    {trend ? (
+                        <img src={`data:image/png;base64,${trend}`} alt="Sales Trend" style={{ width: '100%', borderRadius: 8 }} />
+                    ) : <div style={emptyChart}>No trend data available</div>}
                 </div>
 
                 {/* Top Items */}
                 <div style={chartContainer}>
                     <h4 style={chartTitle}>Top 5 Items (Revenue)</h4>
-                    <div style={{ height: 300 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={topItems.slice(0, 5)} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                                <XAxis type="number" hide />
-                                <YAxis dataKey="_id" type="category" stroke="#64748b" fontSize={12} width={100} />
-                                <Tooltip
-                                    formatter={(value) => [formatCurrency(value), 'Revenue']}
-                                    cursor={{ fill: '#f1f5f9' }}
-                                />
-                                <Bar dataKey="revenue" radius={[0, 4, 4, 0]}>
-                                    {topItems.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
+                    {topItems ? (
+                        <img src={`data:image/png;base64,${topItems}`} alt="Top Items" style={{ width: '100%', borderRadius: 8 }} />
+                    ) : <div style={emptyChart}>No item data available</div>}
                 </div>
 
                 {/* Peak Hours */}
                 <div style={chartContainer}>
                     <h4 style={chartTitle}>Peak Ordering Hours</h4>
-                    <div style={{ height: 300 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={peakHours}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                <XAxis dataKey="_id" stroke="#64748b" fontSize={12} tickFormatter={(h) => `${h}:00`} />
-                                <YAxis stroke="#64748b" fontSize={12} />
-                                <Tooltip labelFormatter={(h) => `${h}:00`} name="Orders" />
-                                <Bar dataKey="count" fill="#8884d8" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                {/* Distribution of Sales */}
-                <div style={chartContainer}>
-                    <h4 style={chartTitle}>Revenue Share by Item</h4>
-                    <div style={{ height: 300 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={topItems.slice(0, 8)}
-                                    dataKey="revenue"
-                                    nameKey="_id"
-                                    cx="50%"
-                                    cy="50%"
-                                    outerRadius={80}
-                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                >
-                                    {topItems.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip formatter={(value) => formatCurrency(value)} />
-                                <Legend verticalAlign="bottom" height={36} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
+                    {peakHours ? (
+                        <img src={`data:image/png;base64,${peakHours}`} alt="Peak Hours" style={{ width: '100%', borderRadius: 8 }} />
+                    ) : <div style={emptyChart}>No activity data available</div>}
                 </div>
             </div>
         </div>
     );
 }
+
+const emptyChart = { height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', background: '#f1f5f9', borderRadius: 8, fontSize: 13 };
 
 function Card({ title, value, color }) {
     return (
