@@ -18,9 +18,8 @@ services:
         value: production
 
   # Frontend Service (Static Site)
-  - type: web
+  - type: static
     name: smart-food-truck-frontend
-    env: static
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
