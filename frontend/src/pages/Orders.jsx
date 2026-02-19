@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+// ... (rest of imports)
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
@@ -12,7 +13,7 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371; // km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
@@ -39,7 +40,7 @@ function normalizeOrderStatus(status) {
   return map[key] || key;
 }
 
-function PickupPlanner({ order, coords, defaultPrep = 20 }){
+function PickupPlanner({ order, coords, defaultPrep = 20 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState('driving');
   const [prepMin, setPrepMin] = useState(defaultPrep);
@@ -68,13 +69,13 @@ function PickupPlanner({ order, coords, defaultPrep = 20 }){
     setEtaMin(estimateTravelMinutes(d, mode));
   }, [myPos, coords?.lat, coords?.lng, mode, live.status, live.minutes]);
 
-  function useMyLocation(){
+  function useMyLocation() {
     setErr(null); setBusy(true);
     if (!('geolocation' in navigator)) { setErr('Geolocation not supported'); setBusy(false); return; }
     navigator.geolocation.getCurrentPosition(pos => {
       setMyPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       setBusy(false);
-    }, e => { setErr(e.message || 'Failed to get location'); setBusy(false); }, { enableHighAccuracy:true, timeout:10000, maximumAge:10000 });
+    }, e => { setErr(e.message || 'Failed to get location'); setBusy(false); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 });
   }
 
   const suggestion = (() => {
@@ -97,26 +98,26 @@ function PickupPlanner({ order, coords, defaultPrep = 20 }){
   if (!coords) return null;
   return (
     <div style={{ marginTop: 8, border: '1px solid #e5e7eb', borderRadius: 6, padding: 8 }}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <strong style={{ fontSize: 13 }}>Plan Pickup</strong>
-        <button type="button" onClick={()=> setOpen(o=>!o)}>{open ? 'Hide' : 'Plan'}</button>
+        <button type="button" onClick={() => setOpen(o => !o)}>{open ? 'Hide' : 'Plan'}</button>
       </div>
       {open && (
-        <div style={{ marginTop: 8, display:'grid', gap:8 }}>
-          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-            <label style={{ fontSize:12 }}>Mode
-              <select value={mode} onChange={e=> setMode(e.target.value)} style={{ marginLeft:6 }}>
+        <div style={{ marginTop: 8, display: 'grid', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ fontSize: 12 }}>Mode
+              <select value={mode} onChange={e => setMode(e.target.value)} style={{ marginLeft: 6 }}>
                 <option value="driving">Driving</option>
                 <option value="walking">Walking</option>
                 <option value="cycling">Cycling</option>
               </select>
             </label>
-            <label style={{ fontSize:12 }}>Prep (min)
-              <input type="number" min={1} max={180} value={prepMin} onChange={e=> setPrepMin(Number(e.target.value)||defaultPrep)} style={{ width:70, marginLeft:6 }} />
+            <label style={{ fontSize: 12 }}>Prep (min)
+              <input type="number" min={1} max={180} value={prepMin} onChange={e => setPrepMin(Number(e.target.value) || defaultPrep)} style={{ width: 70, marginLeft: 6 }} />
             </label>
             <button type="button" onClick={useMyLocation} disabled={busy}>{busy ? 'Locating…' : (myPos ? 'Update my location' : 'Use my location')}</button>
           </div>
-          <div style={{ fontSize:13, color:'#111', display:'flex', gap:6, alignItems:'baseline', flexWrap:'wrap' }}>
+          <div style={{ fontSize: 13, color: '#111', display: 'flex', gap: 6, alignItems: 'baseline', flexWrap: 'wrap' }}>
             {etaMin ? (
               <>
                 <span>
@@ -125,13 +126,13 @@ function PickupPlanner({ order, coords, defaultPrep = 20 }){
                 {suggestion && <span>· {suggestion}</span>}
               </>
             ) : (
-              <span style={{ opacity:.7 }}>Get ETA by using your location.</span>
+              <span style={{ opacity: .7 }}>Get ETA by using your location.</span>
             )}
           </div>
           {mapsUrl && (
-            <a href={mapsUrl} target="_blank" rel="noreferrer" style={{ fontSize:12 }}>Open route in OpenStreetMap</a>
+            <a href={mapsUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>Open route in OpenStreetMap</a>
           )}
-          {err && <div style={{ color:'#b91c1c', fontSize:12 }}>{err}</div>}
+          {err && <div style={{ color: '#b91c1c', fontSize: 12 }}>{err}</div>}
         </div>
       )}
     </div>
@@ -162,7 +163,7 @@ export default function Orders() {
       .then(async ([ordersRes, trucksRes]) => {
         if (!mounted) return;
         let filteredOrders = ordersRes.data || [];
-        
+
         // Filter orders if staff is assigned to a specific truck
         if (user?.role === 'staff' && user?.assignedTruck) {
           const assignedTruckId = user.assignedTruck;
@@ -171,7 +172,7 @@ export default function Orders() {
             return tid === assignedTruckId;
           });
         }
-        
+
         if (ordersRes.success) {
           setOrders(filteredOrders);
           const map = {};
@@ -187,11 +188,11 @@ export default function Orders() {
         if (ordersRes.success) {
           const missingIds = new Set();
           for (const o of filteredOrders) {
-            const tid = typeof o.truck==='object' ? (o.truck.id||o.truck._id) : o.truck;
+            const tid = typeof o.truck === 'object' ? (o.truck.id || o.truck._id) : o.truck;
             if (tid && !byId[tid]) missingIds.add(tid);
           }
           if (missingIds.size) {
-            const fetched = await Promise.all(Array.from(missingIds).map(id => api.getTruck(id).catch(()=>null)));
+            const fetched = await Promise.all(Array.from(missingIds).map(id => api.getTruck(id).catch(() => null)));
             fetched.forEach(resp => {
               if (resp && resp.success && resp.data) {
                 const t = resp.data; const key = t.id || t._id; nameMap[key] = t.name; byId[key] = t;
@@ -212,7 +213,7 @@ export default function Orders() {
     if (user?.role !== 'customer') return;
     if (typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission === 'default') {
-        try { Notification.requestPermission(); } catch {}
+        try { Notification.requestPermission(); } catch { }
       }
     }
   }, [user]);
@@ -302,7 +303,7 @@ export default function Orders() {
 
   useSocketRooms({ token, rooms: roomList, listeners, enabled: Boolean(token && user?.role) });
 
-  function notifyReady(order){
+  function notifyReady(order) {
     if (typeof window === 'undefined' || !('Notification' in window)) return;
     if (Notification.permission !== 'granted') return;
     const title = 'Your order is ready for pickup';
@@ -311,16 +312,16 @@ export default function Orders() {
       const n = new Notification(title, { body, tag: order._id });
       n.onclick = () => {
         window.focus();
-        const truckId = typeof order.truck==='object' ? (order.truck.id||order.truck._id) : order.truck;
+        const truckId = typeof order.truck === 'object' ? (order.truck.id || order.truck._id) : order.truck;
         if (truckId) window.open(`/trucks/${truckId}`, '_blank');
         n.close();
       };
-    } catch {}
+    } catch { }
   }
 
   function getNextStatus(current) {
     const key = normalizeOrderStatus(current);
-    const flow = ['PLACED','ACCEPTED','PREPARING','READY','COMPLETED'];
+    const flow = ['PLACED', 'ACCEPTED', 'PREPARING', 'READY', 'COMPLETED'];
     const idx = flow.indexOf(key);
     if (idx === -1 || idx === flow.length - 1) return null;
     return flow[idx + 1];
@@ -339,12 +340,12 @@ export default function Orders() {
     }
   }
 
-  function openChat(order){
+  function openChat(order) {
     setChatOrder(order);
     setChatOpen(true);
   }
 
-  function toggleExpand(orderId){
+  function toggleExpand(orderId) {
     const newSet = new Set(expandedOrders);
     if (newSet.has(orderId)) {
       newSet.delete(orderId);
@@ -354,17 +355,17 @@ export default function Orders() {
     setExpandedOrders(newSet);
   }
 
-  function shortId(id){ return typeof id === 'string' ? id.slice(-6) : ''; }
-  function orderCode(o){ const sid = shortId(o._id||''); return sid ? `ORD-${sid.toUpperCase()}` : 'ORD-—'; }
-  function pickupCode(o){ const sid = shortId(o._id||''); return sid ? sid.toUpperCase() : '—'; }
-  function getTruckId(o){ return typeof o.truck==='object' ? (o.truck.id||o.truck._id) : o.truck; }
-  function getTruckObj(o){ const id = getTruckId(o); return (typeof o.truck==='object' ? o.truck : trucksById[id]) || null; }
-  function truckLabel(o){
+  function shortId(id) { return typeof id === 'string' ? id.slice(-6) : ''; }
+  function orderCode(o) { const sid = shortId(o._id || ''); return sid ? `ORD-${sid.toUpperCase()}` : 'ORD-—'; }
+  function pickupCode(o) { const sid = shortId(o._id || ''); return sid ? sid.toUpperCase() : '—'; }
+  function getTruckId(o) { return typeof o.truck === 'object' ? (o.truck.id || o.truck._id) : o.truck; }
+  function getTruckObj(o) { const id = getTruckId(o); return (typeof o.truck === 'object' ? o.truck : trucksById[id]) || null; }
+  function truckLabel(o) {
     if (o.truck && typeof o.truck === 'object') return o.truck.name || shortId(o.truck.id || o.truck._id || '');
     if (typeof o.truck === 'string') return truckNames[o.truck] || shortId(o.truck);
     return '—';
   }
-  function directionsUrl(o){
+  function directionsUrl(o) {
     const t = getTruckObj(o);
     const live = t?.liveLocation; const base = t?.location;
     const lat = typeof live?.lat === 'number' ? live.lat : (typeof base?.lat === 'number' ? base.lat : null);
@@ -374,7 +375,7 @@ export default function Orders() {
     }
     return null;
   }
-  function coords(o){
+  function coords(o) {
     const t = getTruckObj(o);
     const live = t?.liveLocation; const base = t?.location;
     const lat = typeof live?.lat === 'number' ? live.lat : (typeof base?.lat === 'number' ? base.lat : null);
@@ -382,13 +383,13 @@ export default function Orders() {
     return (lat !== null && lng !== null) ? { lat, lng } : null;
   }
 
-  function prepDefault(o){
+  function prepDefault(o) {
     const candidates = [o.estimatedPrepMinutes, o.prepMinutes, o.prepTimeMin, o.prepTime];
     for (const c of candidates) { if (typeof c === 'number' && c > 0) return c; }
     return 20; // fallback
   }
 
-  function displayStatus(status){
+  function displayStatus(status) {
     const key = normalizeOrderStatus(status);
     if (user?.role !== 'customer') return key || status;
     const map = {
@@ -409,7 +410,7 @@ export default function Orders() {
     <div style={{ padding: 20 }}>
       <h2>Orders ({orders.length})</h2>
       {user?.role === 'customer' && (
-        <div style={{ background:'#f8fafc', border:'1px solid #e5e7eb', padding:'8px 10px', borderRadius:6, margin:'8px 0 12px' }}>
+        <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', padding: '8px 10px', borderRadius: 6, margin: '8px 0 12px' }}>
           Pickup only: collect your order from the truck. Status “picked up” means it’s been handed over at the truck.
         </div>
       )}
@@ -450,7 +451,7 @@ export default function Orders() {
                 <tr style={{ borderBottom: '1px solid #ddd' }}>
                   <td style={td}>
                     <div><span title={o._id}>{orderCode(o)}</span></div>
-                    <div style={{ fontSize:11, opacity:.7 }}>Pickup Code: <strong>{pickupCode(o)}</strong></div>
+                    <div style={{ fontSize: 11, opacity: .7 }}>Pickup Code: <strong>{pickupCode(o)}</strong></div>
                   </td>
                   {user?.role === 'customer' && (
                     <td style={td}>{truckLabel(o)}</td>
@@ -465,11 +466,11 @@ export default function Orders() {
                         </button>
                       </td>
                       <td style={td}>
-                        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                          {['manager','staff','admin'].includes(user.role) && (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {['manager', 'staff', 'admin'].includes(user.role) && (
                             <button
                               onClick={() => advanceStatus(o)}
-                              disabled={!getNextStatus(o.status) || ['CANCELLED','COMPLETED'].includes(normalizeOrderStatus(o.status))}
+                              disabled={!getNextStatus(o.status) || ['CANCELLED', 'COMPLETED'].includes(normalizeOrderStatus(o.status))}
                             >
                               Next
                             </button>
@@ -486,8 +487,8 @@ export default function Orders() {
                       <td style={td}>{formatCurrency(o.total || 0)}</td>
                       <td style={td}>
                         <div>
-                          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom: 6 }}>
-                            <a href={`/trucks/${getTruckId(o)}`} style={{ textDecoration:'none' }}>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                            <a href={`/trucks/${getTruckId(o)}`} style={{ textDecoration: 'none' }}>
                               <button type="button">View Truck</button>
                             </a>
                             {token && <button onClick={() => openChat(o)}>Chat</button>}
@@ -507,11 +508,11 @@ export default function Orders() {
                         </button>
                       </td>
                       <td style={td}>
-                        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                          {['manager','staff','admin'].includes(user.role) && (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {['manager', 'staff', 'admin'].includes(user.role) && (
                             <button
                               onClick={() => advanceStatus(o)}
-                              disabled={!getNextStatus(o.status) || ['CANCELLED','COMPLETED'].includes(normalizeOrderStatus(o.status))}
+                              disabled={!getNextStatus(o.status) || ['CANCELLED', 'COMPLETED'].includes(normalizeOrderStatus(o.status))}
                             >
                               Next
                             </button>
@@ -566,7 +567,7 @@ export default function Orders() {
         open={chatOpen}
         onClose={() => setChatOpen(false)}
         title={chatOrder ? `Order Chat · ${chatOrder._id.slice(-6)}` : 'Order Chat'}
-        roomResolver={(tok)=> chatOrder ? chatApi.getOrderRoom(tok, chatOrder._id) : null}
+        roomResolver={(tok) => chatOrder ? chatApi.getOrderRoom(tok, chatOrder._id) : null}
       />
     </div>
   );

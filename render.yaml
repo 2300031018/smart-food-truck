@@ -27,3 +27,7 @@ services:
     envVars:
       - key: VITE_API_TARGET
         sync: false
+    routes:
+      - type: rewrite
+        source: '/*'
+        destination: /index.html
