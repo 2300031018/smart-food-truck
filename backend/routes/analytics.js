@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const analyticsController = require('../controllers/analyticsController');
-const { protect, authorize } = require('../middleware/auth');
+const auth = require('../middleware/auth');
+const authorize = require('../middleware/role');
 
 // All analytics routes require admin or manager
-router.use(protect);
+router.use(auth);
 router.use(authorize('admin', 'manager'));
 
 router.get('/summary', analyticsController.getSummary);
