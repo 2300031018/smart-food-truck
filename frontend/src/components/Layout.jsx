@@ -19,7 +19,8 @@ export default function Layout({ children }) {
   } else if (role === 'admin') {
     // Admin — System Control Layer
     navLinks.push(
-      { to: '/admin', label: 'Admin Dashboard' }
+      { to: '/admin', label: 'Admin Dashboard' },
+      { to: '/analytics', label: 'Analytics' }
     );
   } else if (role === 'manager') {
     // Manager — Operations & Supervision
@@ -27,7 +28,8 @@ export default function Layout({ children }) {
       { to: '/manager', label: 'Manager Dashboard' },
       { to: '/manager/staff', label: 'My Staff' },
       { to: '/trucks', label: 'My Trucks' },
-      { to: '/orders', label: 'Orders' }
+      { to: '/orders', label: 'Orders' },
+      { to: '/analytics', label: 'Analytics' }
     );
   } else if (role === 'staff') {
     // Staff — Execution

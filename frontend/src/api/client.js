@@ -101,7 +101,25 @@ export const api = {
   deactivateStaff: (token, id) => request(`/users/staff/${id}/deactivate`, { method: 'PATCH', token }),
   reactivateStaff: (token, id) => request(`/users/staff/${id}/reactivate`, { method: 'PATCH', token }),
   assignStaffToTruck: (token, id, truckId) => request(`/users/staff/${id}/assign`, { method: 'PATCH', body: { truckId }, token }),
-  unassignStaffFromTruck: (token, id) => request(`/users/staff/${id}/unassign`, { method: 'PATCH', token })
+  unassignStaffFromTruck: (token, id) => request(`/users/staff/${id}/unassign`, { method: 'PATCH', token }),
+
+  // Analytics
+  getAnalyticsSummary: (token, params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/analytics/summary${qs ? '?' + qs : ''}`, { token });
+  },
+  getSalesTrend: (token, params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/analytics/sales-trend${qs ? '?' + qs : ''}`, { token });
+  },
+  getTopItems: (token, params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/analytics/top-items${qs ? '?' + qs : ''}`, { token });
+  },
+  getPeakHours: (token, params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/analytics/peak-hours${qs ? '?' + qs : ''}`, { token });
+  }
 };
 
 // Manager-specific helpers (limited scope)
