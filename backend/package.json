@@ -24,6 +24,7 @@
     "jsonwebtoken": "^9.0.2",
     "mailgun.js": "^12.7.0",
     "mongoose": "^8.18.3",
+    "node-cron": "^4.2.1",
     "socket.io": "^4.7.5"
   },
   "devDependencies": {

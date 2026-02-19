@@ -8,9 +8,10 @@ import { formatCurrency } from '../utils/currency';
 export default function AnalyticsDashboard() {
     const { token, user } = useAuth();
     const [summary, setSummary] = useState({ totalRevenue: 0, orderCount: 0, avgOrderValue: 0 });
-    const [trend, setTrend] = useState([]);
-    const [topItems, setTopItems] = useState([]);
-    const [peakHours, setPeakHours] = useState([]);
+    const [lastUpdated, setLastUpdated] = useState(null);
+    const [trend, setTrend] = useState(null);
+    const [topItems, setTopItems] = useState(null);
+    const [peakHours, setPeakHours] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [days, setDays] = useState(30);
@@ -32,7 +33,6 @@ export default function AnalyticsDashboard() {
         const params = { days };
         if (selectedTruck) params.truckId = selectedTruck;
 
-        // Use a single call to the combined analytics endpoint
         api.getAnalyticsSummary(token, params).then(res => {
             if (!mounted) return;
             if (res.success) {
@@ -40,10 +40,11 @@ export default function AnalyticsDashboard() {
                 setTrend(res.data.charts?.salesTrend || null);
                 setTopItems(res.data.charts?.topItems || null);
                 setPeakHours(res.data.charts?.peakHours || null);
+                setLastUpdated(res.data.lastUpdated);
                 setError(null);
             }
         }).catch(err => {
-            if (mounted) setError(err.message || 'Failed to load analytics');
+            if (mounted) setError(err.data?.error || err.message || 'Failed to load analytics');
         }).finally(() => {
             if (mounted) setLoading(false);
         });
@@ -51,15 +52,29 @@ export default function AnalyticsDashboard() {
         return () => { mounted = false; };
     }, [token, days, selectedTruck]);
 
-    if (loading && !trend) return <div style={{ padding: 20 }}>Gathering data science insights...</div>;
-    if (error) return <div style={{ padding: 20, color: 'red' }}>Error: {error}</div>;
+    if (loading && !trend) return <div style={{ padding: 20 }}>Fetching precomputed insights...</div>;
+    if (error) return (
+        <div style={{ padding: 20 }}>
+            <div style={{ color: '#ef4444', background: '#fee2e2', padding: 16, borderRadius: 8, border: '1px solid #fecaca' }}>
+                <strong>Analytics Unavailable:</strong> {error}
+            </div>
+            <p style={{ marginTop: 12, color: '#64748b' }}>The background engine might still be crunching the data. Please check back in a few minutes.</p>
+        </div>
+    );
 
     return (
         <div style={{ padding: '24px', fontFamily: 'system-ui', background: '#f8fafc', minHeight: '100vh' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <h2 style={{ margin: 0, color: '#1e293b' }}>
-                    Analytics & Visualization <span style={{ fontSize: 13, fontWeight: 400, color: '#6366f1' }}>(Powered by Python)</span>
-                </h2>
+                <div>
+                    <h2 style={{ margin: 0, color: '#1e293b' }}>
+                        Analytics & Visualization <span style={{ fontSize: 13, fontWeight: 400, color: '#6366f1' }}>(Precomputed)</span>
+                    </h2>
+                    {lastUpdated && (
+                        <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+                            Last updated: {new Date(lastUpdated).toLocaleString()}
+                        </div>
+                    )}
+                </div>
 
                 <div style={{ display: 'flex', gap: 12 }}>
                     {user?.role === 'admin' && (

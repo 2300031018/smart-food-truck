@@ -12,5 +12,6 @@ router.get('/summary', analyticsController.getSummary);
 router.get('/sales-trend', analyticsController.getSalesTrend);
 router.get('/top-items', analyticsController.getTopItems);
 router.get('/peak-hours', analyticsController.getPeakHours);
+router.post('/refresh', authorize('admin'), analyticsController.triggerRefresh);
 
 module.exports = router;

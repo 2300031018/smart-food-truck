@@ -1,87 +1,62 @@
-const { spawn } = require('child_process');
-const path = require('path');
-const asyncHandler = require('../utils/asyncHandler');
-const User = require('../models/User');
+const Analytics = require('../models/Analytics');
 const Truck = require('../models/Truck');
+const User = require('../models/User');
+const { refreshAllAnalytics } = require('../utils/analyticsWorker');
+const asyncHandler = require('../utils/asyncHandler');
 
 /**
- * Main analytics endpoint that spawns the Python engine
+ * Serves precomputed analytics from the database
  * GET /api/analytics?truckId=...&days=30
  */
 exports.getAnalytics = asyncHandler(async (req, res) => {
     let { truckId, days = 30 } = req.query;
-    const scriptPath = path.join(__dirname, '../analytics/engine.py');
+    days = parseInt(days);
 
-    // Fetch fresh user data from DB to ensure role is correct
+    // Fetch user for permissions
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
-    // Role-based filtering logic
+    // Role-based filtering
     if (user.role === 'manager') {
-        // Find all trucks managed by this user
         const managedTrucks = await Truck.find({ manager: user._id }).select('_id');
         const managedIds = managedTrucks.map(t => t._id.toString());
 
-        if (managedIds.length === 0) {
-            return res.status(403).json({ success: false, error: 'Unauthorized: No trucks assigned to manage' });
-        }
-
-        if (!truckId) {
-            // Default to the first managed truck if none specified
-            truckId = managedIds[0];
-        } else if (!managedIds.includes(truckId)) {
-            return res.status(403).json({ success: false, error: 'Unauthorized: You do not manage this truck' });
-        }
+        if (managedIds.length === 0) return res.status(403).json({ success: false, error: 'No trucks assigned' });
+        if (!truckId) truckId = managedIds[0];
+        else if (!managedIds.includes(truckId)) return res.status(403).json({ success: false, error: 'Access denied' });
     } else if (user.role === 'admin') {
-        // Admin can see null (all) or any specific truckId
-        truckId = truckId || 'null';
+        // Admin can see null/all or specific
     } else if (user.role === 'staff') {
-        // If staff, restrict to their assigned truck
-        if (!user.assignedTruck) {
-            return res.status(403).json({ success: false, error: 'Unauthorized: No truck assigned to you' });
-        }
+        if (!user.assignedTruck) return res.status(403).json({ success: false, error: 'No truck assigned' });
         truckId = user.assignedTruck.toString();
-    } else {
-        // Other roles (customer) shouldn't even reach here due to route middleware
-        return res.status(403).json({ success: false, error: 'Forbidden' });
     }
 
-    // Prepare arguments
-    const args = [scriptPath, truckId, days];
+    // Fetch the precomputed record
+    const query = { days };
+    if (truckId && truckId !== 'null') query.truck = truckId;
+    else query.truck = null;
 
-    const python = spawn('python', args);
-    // ... rest of logic stays same
-    let resultData = '';
-    let errorData = '';
+    const result = await Analytics.findOne(query);
+    if (!result) {
+        return res.status(404).json({
+            success: false,
+            error: 'Analytics not ready yet. Please try again later or trigger a refresh.'
+        });
+    }
 
-    python.stdout.on('data', (data) => {
-        resultData += data.toString();
-    });
-
-    python.stderr.on('data', (data) => {
-        errorData += data.toString();
-    });
-
-    python.on('close', (code) => {
-        if (code !== 0) {
-            console.error(`Python error (code ${code}):`, errorData);
-            return res.status(500).json({ success: false, error: 'Analytics engine failed' });
-        }
-
-        try {
-            const parsed = JSON.parse(resultData);
-            if (!parsed.success) {
-                return res.status(500).json({ success: false, error: parsed.error });
-            }
-            res.json(parsed);
-        } catch (e) {
-            console.error('Failed to parse Python output:', resultData);
-            res.status(500).json({ success: false, error: 'Malformed analytics data' });
-        }
-    });
+    res.json({ success: true, data: result });
 });
 
-// Keep legacy placeholders if needed, but they all now point to the same engine if desired
+/**
+ * Manually triggers a refresh (Admin only)
+ * POST /api/analytics/refresh
+ */
+exports.triggerRefresh = asyncHandler(async (req, res) => {
+    // Fire and forget (or await if you want to wait, but it takes 15-30s)
+    refreshAllAnalytics();
+    res.json({ success: true, message: 'Analytics refresh started' });
+});
+
 exports.getSummary = exports.getAnalytics;
 exports.getSalesTrend = exports.getAnalytics;
 exports.getTopItems = exports.getAnalytics;

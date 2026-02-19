@@ -15,6 +15,11 @@ if (!process.env.MONGO_URI) {
 
 connectDB();
 
+const { initAnalyticsJob } = require('./utils/analyticsWorker');
+
+// Initialize analytics background job
+initAnalyticsJob();
+
 const security = require('./config/security');
 const app = express();
 app.disable('x-powered-by');
