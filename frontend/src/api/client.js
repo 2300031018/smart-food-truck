@@ -107,5 +107,6 @@ export const managerApi = {
   // Limited staff update (name, staffRole only)
   updateStaffLimited: (token, id, payload) => request(`/users/staff/${id}/manager-update`, { method: 'PATCH', body: payload, token }),
   getManagedTrucks: (token) => request('/trucks/managed', { token }),
-  reclaimUnassigned: (token) => request('/users/staff/reclaim', { token })
+  reclaimUnassigned: (token) => request('/users/staff/reclaim', { token }),
+  getForecast: (token, truckId) => request(`/forecast/truck/${truckId}`, { token })
 };

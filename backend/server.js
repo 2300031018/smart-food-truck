@@ -39,6 +39,7 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/chats', require('./routes/chats'));
 app.use('/api/health', require('./routes/health'));
+app.use('/api/forecast', require('./routes/forecast'));
 
 // Not found handler
 const notFound = require('./middleware/notFound');

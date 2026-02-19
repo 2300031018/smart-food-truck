@@ -6,6 +6,7 @@ import RouteEditorModal from '../components/RouteEditorModal';
 import TruckFormModal from '../components/TruckFormModal';
 import { clearRoutePathsForTruck } from '../utils/routePathCache';
 import { useSocketRooms } from '../hooks/useSocketRooms';
+import SmartInsights from '../components/SmartInsights';
 
 export default function DashboardManager() {
   const { user } = useAuth();
@@ -19,6 +20,7 @@ export default function DashboardManager() {
   const [editingTruck, setEditingTruck] = useState(null); // Route Editor
   const [editingDetails, setEditingDetails] = useState(null); // Details Editor (Create/Edit)
   const [busyId, setBusyId] = useState(null);
+  const [insightId, setInsightId] = useState(null);
 
   useEffect(() => { api.getManagedTrucks(token).then(d => { if (d.success) setTrucks(d.data); }); }, [token]);
 
@@ -83,7 +85,7 @@ export default function DashboardManager() {
           <input placeholder='Password' type='password' value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required />
           <select value={form.truckId} onChange={e => setForm(f => ({ ...f, truckId: e.target.value }))} required>
             <option value=''>Select Truck</option>
-            {trucks.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
+            {trucks.map(t => <option key={t.id || t._id} value={t.id || t._id}>{t.name}</option>)}
           </select>
           <button className="btn btn-primary" disabled={creating}>
             {creating ? 'Creating...' : 'Create Staff'}
@@ -112,41 +114,47 @@ export default function DashboardManager() {
 
         <div className="truck-list">
           {trucks.length === 0 && <p style={{ color: '#666' }}>No trucks assigned.</p>}
-          {trucks.map(t => (
-            <div key={t.id || t._id} style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 15, marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h4 style={{ margin: '0 0 5px 0' }}>{t.name}</h4>
-                <div style={{ fontSize: 13, color: '#64748b' }}>
-                  Status: <span style={{ fontWeight: 500, color: t.status === 'OPEN' || t.status === 'SERVING' ? 'green' : '#64748b' }}>{t.status}</span>
+          {trucks.map(t => {
+            const tid = t.id || t._id;
+            return (
+              <div key={tid} style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 15, marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 5px 0' }}>{t.name}</h4>
+                    <div style={{ fontSize: 13, color: '#64748b' }}>
+                      Status: <span style={{ fontWeight: 500, color: t.status === 'OPEN' || t.status === 'SERVING' ? 'green' : '#64748b' }}>{t.status}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn" style={{ background: '#f0f9ff', color: '#0369a1', borderColor: '#bae6fd' }} onClick={() => setInsightId(insightId === tid ? null : tid)}>
+                      {insightId === tid ? 'Hide Insights' : 'Smart Insights'}
+                    </button>
+                    <button className="btn" style={{ background: '#e2e8f0' }} onClick={() => setEditingDetails(t)}>Edit Details</button>
+                    <button className="btn btn-secondary" onClick={() => setEditingTruck(t)}>Edit Route</button>
+                    <button className="btn" style={{ background: '#fee2e2', color: '#dc2626' }} disabled={busyId === tid} onClick={() => handleDeleteTruck(tid)}>
+                      {busyId === tid ? '...' : 'Delete'}
+                    </button>
+                  </div>
                 </div>
+                {insightId === tid && (
+                  <SmartInsights truckId={tid} token={token} onboardClose={() => setInsightId(null)} />
+                )}
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn" style={{ background: '#e2e8f0' }} onClick={() => setEditingDetails(t)}>Edit Details</button>
-                <button className="btn btn-secondary" onClick={() => setEditingTruck(t)}>Edit Route</button>
-                <button className="btn" style={{ background: '#fee2e2', color: '#dc2626' }} disabled={busyId === (t.id || t._id)} onClick={() => handleDeleteTruck(t.id || t._id)}>
-                  {busyId === (t.id || t._id) ? '...' : 'Delete'}
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
       <ManagerMenuPanel />
 
       {editingDetails && (
-        (() => {
-          const isExisting = Boolean(editingDetails.id || editingDetails._id);
-          return (
-            <TruckFormModal
-              truck={isExisting ? editingDetails : null}
-              token={token}
-              onClose={() => setEditingDetails(null)}
-              onSave={() => api.getManagedTrucks(token).then(d => { if (d.success) setTrucks(d.data); })}
-              onSuccess={(newTruck) => !isExisting && handleCreateSuccess(newTruck)}
-            />
-          );
-        })()
+        <TruckFormModal
+          truck={editingDetails.id || editingDetails._id ? editingDetails : null}
+          token={token}
+          onClose={() => setEditingDetails(null)}
+          onSave={() => api.getManagedTrucks(token).then(d => { if (d.success) setTrucks(d.data); })}
+          onSuccess={(newTruck) => !(editingDetails.id || editingDetails._id) && handleCreateSuccess(newTruck)}
+        />
       )}
 
       {editingTruck && (
