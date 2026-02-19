@@ -69,8 +69,11 @@ export const api = {
     return request(`/recommendations/truck/${truckId}${qs}`);
   },
 
-  getMenuItems: (truckId, { group } = {}) => {
-    const qs = group ? `?group=${encodeURIComponent(group)}` : '';
+  getMenuItems: (truckId, { group, all } = {}) => {
+    const params = new URLSearchParams();
+    if (group) params.append('group', group);
+    if (all) params.append('all', 'true');
+    const qs = params.toString() ? `?${params.toString()}` : '';
     return request(`/menu/truck/${truckId}${qs}`);
   },
   addMenuItem: (token, truckId, payload) => request(`/menu/truck/${truckId}`, { method: 'POST', body: payload, token }),

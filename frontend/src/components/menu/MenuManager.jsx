@@ -30,7 +30,7 @@ export default function MenuManager({ truckId }) {
     const fetchData = async () => {
       try {
         const tRes = await api.getTruck(truckId);
-        const mRes = await api.getMenuItems(truckId, groupMode ? { group: 'category' } : {});
+        const mRes = await api.getMenuItems(truckId, { all: true, ...(groupMode ? { group: 'category' } : {}) });
         if (!mounted) return;
         if (tRes.success) setTruck(tRes.data);
         if (mRes.success) {
@@ -75,7 +75,7 @@ export default function MenuManager({ truckId }) {
       const res = await api.addMenuItem(token, truckId, payload);
       if (res.success) {
         if (groupMode) {
-          const mRes = await api.getMenuItems(truckId, { group: 'category' });
+          const mRes = await api.getMenuItems(truckId, { group: 'category', all: true });
           if (mRes.success) setGrouped(mRes.data);
         } else {
           setItems(i => [...i, res.data]);
@@ -102,7 +102,7 @@ export default function MenuManager({ truckId }) {
         const updated = res.data || res;
         if (groupMode) {
           // refetch grouped data to ensure category grouping/order is correct
-          const mRes = await api.getMenuItems(truckId, { group: 'category' });
+          const mRes = await api.getMenuItems(truckId, { group: 'category', all: true });
           if (mRes.success) setGrouped(mRes.data);
         } else {
           setItems(items => items.map(it => it._id === editingId ? updated : it));
@@ -119,7 +119,7 @@ export default function MenuManager({ truckId }) {
       if (res && (res.success || res._id)) {
         const updated = res.data || res;
         if (groupMode) {
-          const mRes = await api.getMenuItems(truckId, { group: 'category' });
+          const mRes = await api.getMenuItems(truckId, { group: 'category', all: true });
           if (mRes.success) setGrouped(mRes.data);
         } else {
           setItems(items => items.map(it => it._id === editingId ? updated : it));

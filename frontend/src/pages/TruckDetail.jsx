@@ -27,7 +27,7 @@ export default function TruckDetail() {
     let mounted = true;
     Promise.all([
       api.getTruck(id),
-      api.getMenuItems(id),
+      api.getMenuItems(id, { all: true }),
       api.getRecommendations(id)
     ]).then(([truckRes, menuRes, recRes]) => {
       if (mounted) {
@@ -233,20 +233,26 @@ export default function TruckDetail() {
       <h3 id="menu-section">Menu</h3>
       <div style={{ display: 'grid', gap: 12, marginBottom: 20 }}>
         {menu.map(item => (
-          <div key={item._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', border: '1px solid #eee', borderRadius: 8, background: '#fff' }}>
+          <div key={item._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', border: '1px solid #eee', borderRadius: 8, background: item.isAvailable ? '#fff' : '#f9fafb', opacity: item.isAvailable ? 1 : 0.7 }}>
             <div>
-              <div style={{ fontWeight: 600 }}>{item.name}</div>
+              <div style={{ fontWeight: 600, color: item.isAvailable ? '#000' : '#666' }}>
+                {item.name} {!item.isAvailable && <span style={{ fontSize: 10, background: '#fee2e2', color: '#dc2626', padding: '2px 6px', borderRadius: 4, marginLeft: 6, textTransform: 'uppercase' }}>Sold Out</span>}
+              </div>
               <div style={{ fontSize: 13, color: '#666' }}>{formatCurrency(item.price)}{item.category ? ` · ${item.category}` : ''}</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {cart[item._id] ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f3f4f6', padding: '4px 8px', borderRadius: 6 }}>
-                  <button onClick={() => removeFromCart(item._id)} style={miniBtn}>-</button>
-                  <span style={{ fontWeight: 600, minWidth: 20, textAlign: 'center' }}>{cart[item._id]}</span>
-                  <button onClick={() => addToCart(item)} style={miniBtn}>+</button>
-                </div>
+              {item.isAvailable ? (
+                cart[item._id] ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f3f4f6', padding: '4px 8px', borderRadius: 6 }}>
+                    <button onClick={() => removeFromCart(item._id)} style={miniBtn}>-</button>
+                    <span style={{ fontWeight: 600, minWidth: 20, textAlign: 'center' }}>{cart[item._id]}</span>
+                    <button onClick={() => addToCart(item)} style={miniBtn}>+</button>
+                  </div>
+                ) : (
+                  <button onClick={() => addToCart(item)}>Add</button>
+                )
               ) : (
-                <button onClick={() => addToCart(item)}>Add</button>
+                <button disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>Unavailable</button>
               )}
             </div>
           </div>

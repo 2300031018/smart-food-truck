@@ -12,7 +12,11 @@ exports.addItem = asyncHandler(async (req, res) => {
 
 exports.getMenuForTruck = asyncHandler(async (req, res) => {
   const group = req.query.group === 'category' ? 'category' : 'flat';
-  const items = await MenuItem.find({ truck: req.params.truckId, isAvailable: true }).lean();
+  const query = { truck: req.params.truckId };
+  if (req.query.all !== 'true') {
+    query.isAvailable = true;
+  }
+  const items = await MenuItem.find(query).lean();
 
   if (req.query.group === 'category') {
     const map = new Map();
