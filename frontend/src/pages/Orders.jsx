@@ -1,5 +1,5 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-// ... (rest of imports)
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
@@ -488,9 +488,9 @@ export default function Orders() {
                       <td style={td}>
                         <div>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
-                            <a href={`/trucks/${getTruckId(o)}`} style={{ textDecoration: 'none' }}>
+                            <Link to={`/trucks/${getTruckId(o)}`} style={{ textDecoration: 'none' }}>
                               <button type="button">View Truck</button>
-                            </a>
+                            </Link>
                             {token && <button onClick={() => openChat(o)}>Chat</button>}
                           </div>
                           <PickupPlanner order={o} coords={coords(o)} defaultPrep={prepDefault(o)} />
