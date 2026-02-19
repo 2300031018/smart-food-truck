@@ -7,6 +7,7 @@ import TruckFormModal from '../components/TruckFormModal';
 import { clearRoutePathsForTruck } from '../utils/routePathCache';
 import { useSocketRooms } from '../hooks/useSocketRooms';
 import SmartInsights from '../components/SmartInsights';
+import ForecastPanel from '../components/manager/ForecastPanel';
 
 export default function DashboardManager() {
   const { user } = useAuth();
@@ -146,6 +147,12 @@ export default function DashboardManager() {
       </div>
 
       <ManagerMenuPanel trucks={trucks} />
+
+      {trucks.length > 0 && (
+        <div className="card" style={{ marginTop: 20 }}>
+          <ForecastPanel trucks={trucks} />
+        </div>
+      )}
 
       {editingDetails && (
         <TruckFormModal

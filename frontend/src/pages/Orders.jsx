@@ -483,6 +483,13 @@ export default function Orders() {
                         <Link to={`/trucks/${tid}`} style={{ textDecoration: 'none' }}>
                           <button type="button">View Truck</button>
                         </Link>
+                        {!['COMPLETED', 'CANCELLED'].includes(normalizeStatus(o.status)) && (
+                          <Link to={`/orders/${o._id}`} style={{ textDecoration: 'none' }}>
+                            <button type="button" style={{ background: '#ede9fe', color: '#6d28d9', borderColor: '#c4b5fd' }}>
+                              📍 Track Order
+                            </button>
+                          </Link>
+                        )}
                         {o.status === 'PLACED' && (
                           <button type="button" style={{ background: '#fee2e2', color: '#dc2626', borderColor: '#fecaca' }} onClick={() => handleCancelOrder(o)}>Cancel</button>
                         )}

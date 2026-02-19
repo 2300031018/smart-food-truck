@@ -16,6 +16,7 @@ import DashboardManager from './pages/DashboardManager';
 import ManagerStaff from './pages/ManagerStaff';
 import AnalyticsDashboard from './pages/AnalyticsDashboard';
 import StaffStock from './pages/StaffStock';
+import OrderTracking from './pages/OrderTracking';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 function Protected({ children }) {
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="/manager/staff" element={<RoleRoute roles={['manager']}><ManagerStaff /></RoleRoute>} />
           <Route path="/staff/stock" element={<RoleRoute roles={['staff']}><StaffStock /></RoleRoute>} />
           <Route path="/orders" element={<Protected><Orders /></Protected>} />
+          <Route path="/orders/:id" element={<Protected><OrderTracking /></Protected>} />
           <Route path="/analytics" element={<RoleRoute roles={['admin', 'manager']}><AnalyticsDashboard /></RoleRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
