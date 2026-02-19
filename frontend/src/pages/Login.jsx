@@ -27,7 +27,13 @@ export default function Login() {
           staff: '/orders',
           customer: '/trucks'
         };
-        navigate(map[role] || '/');
+        const redirect = localStorage.getItem('sft_redirect');
+        if (redirect) {
+          localStorage.removeItem('sft_redirect');
+          navigate(redirect);
+        } else {
+          navigate(map[role] || '/');
+        }
       } else {
         setError('Login failed');
       }

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatCurrency } from '../utils/currency';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import MapEmbed from '../components/MapEmbed';
@@ -8,6 +8,7 @@ import { useSocketRooms } from '../hooks/useSocketRooms';
 
 export default function TruckDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { token, user } = useAuth();
   const [truck, setTruck] = useState(null);
   const [locBusy, setLocBusy] = useState(false);
@@ -39,6 +40,22 @@ export default function TruckDetail() {
       .finally(() => setLoading(false));
 
     return () => { mounted = false; };
+  }, [id]);
+
+  // Restore cart from localStorage on mount (for persistent guest flow)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('sft_pending_order');
+      if (saved) {
+        const { truckId, cart: savedCart, notes: savedNotes } = JSON.parse(saved);
+        if (truckId === id) {
+          setCart(savedCart || {});
+          setNotes(savedNotes || '');
+          // Clear it so it doesn't persist forever
+          localStorage.removeItem('sft_pending_order');
+        }
+      }
+    } catch (e) { console.warn('Failed to restore cart', e); }
   }, [id]);
   const rooms = useMemo(() => (id ? [`truck:${id}`] : []), [id]);
   const handleLocation = useCallback((payload) => {
@@ -146,7 +163,13 @@ export default function TruckDetail() {
   const cartTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   async function handlePlaceOrder() {
-    if (!token) return navigate('/login');
+    if (!token) {
+      // Guest: Save state and redirect to login
+      const pendingData = { truckId: id, cart, notes, redirect: window.location.pathname };
+      localStorage.setItem('sft_pending_order', JSON.stringify(pendingData));
+      localStorage.setItem('sft_redirect', window.location.pathname);
+      return navigate('/login');
+    }
     if (cartItems.length === 0) return;
     setOrdering(true);
     try {
