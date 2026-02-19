@@ -135,7 +135,7 @@ async function main() {
     await runStep('GET /trucks/:id', () => request('GET', `/trucks/${tempTruckId}`));
     await runStep('PUT /trucks/:id', () => request('PUT', `/trucks/${tempTruckId}`, { token: adminToken, body: { description: 'Updated by smoke test' } }));
     await runStep('PATCH /trucks/:id/status-location', () => request('PATCH', `/trucks/${tempTruckId}/status-location`, { token: adminToken, body: { status: 'MOVING', liveLocation: { lat: 12.9718, lng: 77.5948 } } }));
-    await runStep('PATCH /trucks/:id/route-plan', () => request('PATCH', `/trucks/${tempTruckId}/route-plan`, { token: adminToken, body: { routePlan: { timezone: 'Asia/Kolkata', dailyStart: '09:00', dailyEnd: '11:00', stops: [ { name: 'Stop A', lat: 12.9716, lng: 77.5946, stayMin: 15 }, { name: 'Stop B', lat: 12.9732, lng: 77.5962, stayMin: 15 } ] } } }));
+    await runStep('PATCH /trucks/:id/route-plan', () => request('PATCH', `/trucks/${tempTruckId}/route-plan`, { token: adminToken, body: { routePlan: { timezone: 'Asia/Kolkata', dailyStart: '09:00', dailyEnd: '11:00', stops: [{ name: 'Stop A', lat: 12.9716, lng: 77.5946, stayMin: 15 }, { name: 'Stop B', lat: 12.9732, lng: 77.5962, stayMin: 15 }] } } }));
     await runStep('PATCH /trucks/:id/deactivate', () => request('PATCH', `/trucks/${tempTruckId}/deactivate`, { token: adminToken }));
     await runStep('PATCH /trucks/:id/reactivate', () => request('PATCH', `/trucks/${tempTruckId}/reactivate`, { token: adminToken }));
     await runStep('GET /trucks/:id/staff', () => request('GET', `/trucks/${tempTruckId}/staff`, { token: adminToken }));
@@ -199,12 +199,6 @@ async function main() {
     }
   }
 
-  if (tempTruckId) {
-    await runStepExpected('GET /chats/truck/:truckId/room', () => request('GET', `/chats/truck/${tempTruckId}/room`, { token: customerToken }), 403, 'Expected customer access to be forbidden');
-    if (orderId) {
-      await runStep('GET /chats/order/:orderId/room', () => request('GET', `/chats/order/${orderId}/room`, { token: customerToken }));
-    }
-  }
 
   if (menuItemId) {
     await runStep('PATCH /menu/:id/toggle', () => request('PATCH', `/menu/${menuItemId}/toggle`, { token: adminToken }));

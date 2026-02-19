@@ -3,8 +3,6 @@ const asyncHandler = require('../utils/asyncHandler');
 const User = require('../models/User');
 const { emitTruckLocation, emitTruckUpdate, emitTruckDeleted } = require('../socket');
 const MenuItem = require('../models/MenuItem');
-const ChatRoom = require('../models/ChatRoom');
-const ChatMessage = require('../models/ChatMessage');
 const Order = require('../models/Order');
 
 const VALID_TRUCK_STATUSES = new Set(['OPEN', 'PREPARING', 'SERVING', 'SOLD_OUT', 'CLOSED', 'MOVING']);
@@ -470,26 +468,8 @@ exports.deleteTruck = asyncHandler(async (req, res) => {
   await User.updateMany({ role: 'staff', assignedTruck: truck._id }, { $unset: { assignedTruck: '' }, $set: { lastManager: truck.manager ? (truck.manager._id || truck.manager.id || truck.manager) : req.user.id } });
   await MenuItem.deleteMany({ truck: truck._id });
 
-  try {
-    const orders = await Order.find({ truck: truck._id }).select('_id');
-    const orderIds = orders.map(o => o._id);
-    if (orderIds.length) {
-      const orderRooms = await ChatRoom.find({ type: 'order', order: { $in: orderIds } }).select('_id');
-      const orderRoomIds = orderRooms.map(r => r._id);
-      if (orderRoomIds.length) {
-        await ChatMessage.deleteMany({ room: { $in: orderRoomIds } });
-        await ChatRoom.deleteMany({ _id: { $in: orderRoomIds } });
-      }
-      await Order.deleteMany({ _id: { $in: orderIds } });
-    }
-  } catch { }
-
-  try {
-    const rooms = await ChatRoom.find({ type: 'truck', truck: truck._id }).select('_id');
-    const roomIds = rooms.map(r => r._id);
-    if (roomIds.length) await ChatMessage.deleteMany({ room: { $in: roomIds } });
-    await ChatRoom.deleteMany({ type: 'truck', truck: truck._id });
-  } catch { }
+  // 3) Delete Orders for this truck
+  await Order.deleteMany({ truck: truck._id });
 
   await Truck.deleteOne({ _id: truck._id });
   res.json({ success: true, data: { id: String(truck._id), deleted: true } });
