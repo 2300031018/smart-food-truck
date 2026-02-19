@@ -6,7 +6,6 @@ const MenuItem = require('../models/MenuItem');
 const ChatRoom = require('../models/ChatRoom');
 const ChatMessage = require('../models/ChatMessage');
 const Order = require('../models/Order');
-const { cacheGet, cacheSet, cacheDelByPrefix } = require('../utils/cache');
 
 const VALID_TRUCK_STATUSES = new Set(['OPEN', 'PREPARING', 'SERVING', 'SOLD_OUT', 'CLOSED', 'MOVING']);
 const TRUCK_STATUS_ALIASES = {
@@ -99,7 +98,6 @@ function getCurrentLocationFromRoute(routePlan, currentStopIndex) {
   return stop ? { lat: stop.lat, lng: stop.lng } : null;
 }
 
-// PATCH /api/trucks/route-plan-defaults (admin only)
 exports.applyDefaultRoutePlanDefaults = asyncHandler(async (req, res) => {
   const filter = {
     $or: [
@@ -109,17 +107,13 @@ exports.applyDefaultRoutePlanDefaults = asyncHandler(async (req, res) => {
   };
   const update = { routePlan: getDefaultRoutePlan() };
   const result = await Truck.updateMany(filter, update);
-  try { await cacheDelByPrefix('trucks:'); } catch { }
   res.json({ success: true, data: { matched: result.matchedCount || result.n, modified: result.modifiedCount || result.nModified } });
 });
 
-// Create Truck (manager/admin)
-// Admin may pass managerId to assign ownership; manager always becomes owner automatically.
 exports.createTruck = asyncHandler(async (req, res) => {
   const { managerId, routePlan, status, currentStopIndex, ...rest } = req.body || {};
-  let managerToSet = req.user.id; // default: creator
+  let managerToSet = req.user.id;
   if (req.user.role === 'admin' && managerId) {
-    // Validate target manager
     const User = require('../models/User');
     const mgr = await User.findById(managerId);
     if (!mgr || mgr.role !== 'manager') {
@@ -144,15 +138,11 @@ exports.createTruck = asyncHandler(async (req, res) => {
     manager: managerToSet
   });
   truck = await Truck.findById(truck._id).populate('manager', 'id email name role');
-  try { await cacheDelByPrefix('trucks:'); } catch { }
   res.status(201).json({ success: true, data: truck });
   emitTruckUpdate(truck.id, truck);
 });
-// Get all active trucks (include staffCount)
+
 exports.getTrucks = asyncHandler(async (req, res) => {
-  const cacheKey = 'trucks:all';
-  const cached = await cacheGet(cacheKey);
-  if (cached) return res.json({ success: true, data: cached, cached: true });
   const trucks = await Truck.find({ isActive: true }).populate('manager', 'id email name role').populate('staff', 'id');
   const data = trucks.map(t => ({
     id: t.id,
@@ -169,15 +159,10 @@ exports.getTrucks = asyncHandler(async (req, res) => {
     manager: t.manager ? { id: t.manager.id, email: t.manager.email, name: t.manager.name } : null,
     staffCount: (t.staff || []).length
   }));
-  await cacheSet(cacheKey, data, 30);
   res.json({ success: true, data });
 });
 
-// Get single truck (include staffCount)
 exports.getTruck = asyncHandler(async (req, res) => {
-  const cacheKey = `trucks:${req.params.id}`;
-  const cached = await cacheGet(cacheKey);
-  if (cached) return res.json({ success: true, data: cached, cached: true });
   const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role').populate('staff', 'id');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
   const data = {
@@ -194,11 +179,9 @@ exports.getTruck = asyncHandler(async (req, res) => {
     manager: truck.manager ? { id: truck.manager.id, email: truck.manager.email, name: truck.manager.name } : null,
     staffCount: (truck.staff || []).length
   };
-  await cacheSet(cacheKey, data, 30);
   res.json({ success: true, data });
 });
 
-// Get trucks managed by current manager (or all for admin)
 exports.getManagedTrucks = asyncHandler(async (req, res) => {
   if (req.user.role === 'manager') {
     const trucks = await Truck.find({ manager: req.user.id }).populate('manager', 'id email name role');
@@ -211,8 +194,6 @@ exports.getManagedTrucks = asyncHandler(async (req, res) => {
   return res.status(403).json({ success: false, error: { message: 'Forbidden' } });
 });
 
-// Update truck (manager/admin)
-// Admin can reassign manager using managerId; managers cannot change ownership.
 exports.updateTruck = asyncHandler(async (req, res) => {
   const { managerId, ...rest } = req.body || {};
   const update = { ...rest };
@@ -236,28 +217,22 @@ exports.updateTruck = asyncHandler(async (req, res) => {
   }
   const truck = await Truck.findByIdAndUpdate(req.params.id, update, { new: true }).populate('manager', 'id email name role');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
-  try { await cacheDelByPrefix('trucks:'); } catch { }
   res.json({ success: true, data: truck });
   emitTruckUpdate(truck.id, truck);
 });
 
-// Soft deactivate
 exports.deactivateTruck = asyncHandler(async (req, res) => {
   const truck = await Truck.findByIdAndUpdate(req.params.id, { isActive: false, status: 'CLOSED' }, { new: true });
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
-  try { await cacheDelByPrefix('trucks:'); } catch { }
   res.json({ success: true, data: truck });
 });
 
-// Reactivate truck (admin/manager)
 exports.reactivateTruck = asyncHandler(async (req, res) => {
   const truck = await Truck.findByIdAndUpdate(req.params.id, { isActive: true, status: 'OPEN' }, { new: true });
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
-  try { await cacheDelByPrefix('trucks:'); } catch { }
   res.json({ success: true, data: truck });
 });
 
-// PATCH /api/trucks/:id/assign-manager (admin only)
 exports.assignManager = asyncHandler(async (req, res) => {
   const { managerId } = req.body || {};
   if (!managerId) return res.status(422).json({ success: false, error: { message: 'managerId required' } });
@@ -267,19 +242,15 @@ exports.assignManager = asyncHandler(async (req, res) => {
   }
   const truck = await Truck.findByIdAndUpdate(req.params.id, { manager: manager._id }, { new: true }).populate('manager', 'id email name role');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
-  try { await cacheDelByPrefix('trucks:'); } catch { }
   res.json({ success: true, data: truck });
 });
 
-// PATCH /api/trucks/:id/unassign-manager (admin only)
 exports.unassignManager = asyncHandler(async (req, res) => {
   const truck = await Truck.findByIdAndUpdate(req.params.id, { $unset: { manager: '' } }, { new: true });
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
-  try { await cacheDelByPrefix('trucks:'); } catch { }
   res.json({ success: true, data: truck });
 });
 
-// GET /api/trucks/:id/staff (admin or manager of that truck)
 exports.getTruckStaff = asyncHandler(async (req, res) => {
   const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role').populate('staff', 'id email name role staffRole');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
@@ -292,7 +263,6 @@ exports.getTruckStaff = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { id: truck.id, staff: truck.staff } });
 });
 
-// POST /api/trucks/:id/staff (assign existing staff user) (admin or manager of that truck)
 exports.assignStaff = asyncHandler(async (req, res) => {
   const { userId } = req.body || {};
   if (!userId) return res.status(422).json({ success: false, error: { message: 'userId required' } });
@@ -305,29 +275,21 @@ exports.assignStaff = asyncHandler(async (req, res) => {
   if (!staffUser || staffUser.role !== 'staff') {
     return res.status(400).json({ success: false, error: { message: 'Invalid staff userId' } });
   }
-  // Assign
   const oldTruckId = staffUser.assignedTruck ? staffUser.assignedTruck.toString() : null;
   staffUser.assignedTruck = truck._id;
-  // Track lastManager for recovery features
-  if (truck.manager) {
-    const mgrId = truck.manager._id || truck.manager.id || truck.manager;
-    staffUser.lastManager = mgrId;
-  }
+  if (truck.manager) staffUser.lastManager = truck.manager._id || truck.manager.id || truck.manager;
   await staffUser.save();
   truck.staff = truck.staff || [];
   if (!truck.staff.find(id => id.toString() === staffUser._id.toString())) {
     truck.staff.push(staffUser._id);
     await truck.save();
   }
-  // If staff was previously on a different truck, remove from that truck's staff list
   if (oldTruckId && oldTruckId !== truck.id) {
     await Truck.updateOne({ _id: oldTruckId }, { $pull: { staff: staffUser._id } });
   }
-  try { await cacheDelByPrefix('trucks:'); } catch { }
   res.json({ success: true, data: { truckId: truck.id, staffId: staffUser.id } });
 });
 
-// DELETE /api/trucks/:id/staff/:userId (remove staff assignment) (admin or manager of that truck)
 exports.unassignStaff = asyncHandler(async (req, res) => {
   const { id: truckId, userId } = { id: req.params.id, userId: req.params.userId };
   const truck = await Truck.findById(truckId).populate('manager', 'id email name role');
@@ -340,19 +302,13 @@ exports.unassignStaff = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, error: { message: 'Staff not assigned to this truck' } });
   }
   staffUser.assignedTruck = undefined;
-  // Remember who last managed this staff for manager recovery
-  if (truck.manager) {
-    const mgrId = truck.manager._id || truck.manager.id || truck.manager;
-    staffUser.lastManager = mgrId;
-  }
+  if (truck.manager) staffUser.lastManager = truck.manager._id || truck.manager.id || truck.manager;
   await staffUser.save();
   truck.staff = (truck.staff || []).filter(id => id.toString() !== staffUser._id.toString());
   await truck.save();
-  try { await cacheDelByPrefix('trucks:'); } catch { }
   res.json({ success: true, data: { truckId: truck.id, removedStaffId: staffUser.id } });
 });
 
-// PATCH /api/trucks/:id/route-plan (update predefined route schedule)
 exports.updateRoutePlan = asyncHandler(async (req, res) => {
   const { routePlan } = req.body || {};
   const normalizedRoutePlan = normalizeRoutePlan(routePlan);
@@ -361,7 +317,6 @@ exports.updateRoutePlan = asyncHandler(async (req, res) => {
   }
   const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
-  // Permission: admin or manager of truck
   if (req.user.role === 'manager') {
     if (!truck.manager || truck.manager.id !== req.user.id) {
       return res.status(403).json({ success: false, error: { message: 'Not manager of this truck' } });
@@ -369,7 +324,6 @@ exports.updateRoutePlan = asyncHandler(async (req, res) => {
   } else if (req.user.role !== 'admin') {
     return res.status(403).json({ success: false, error: { message: 'Forbidden' } });
   }
-
   truck.routePlan = normalizedRoutePlan;
   truck.currentStopIndex = clampStopIndex(truck.currentStopIndex, normalizedRoutePlan.stops);
   const nextLocation = getCurrentLocationFromRoute(normalizedRoutePlan, truck.currentStopIndex);
@@ -380,17 +334,14 @@ exports.updateRoutePlan = asyncHandler(async (req, res) => {
   const normalizedExisting = normalizeTruckStatus(truck.status);
   if (normalizedExisting) truck.status = normalizedExisting;
   await truck.save();
-  try { await cacheDelByPrefix('trucks:'); } catch { }
   res.json({ success: true, data: { id: truck.id, routePlan: truck.routePlan } });
   emitTruckUpdate(truck.id, { routePlan: truck.routePlan, currentStopIndex: truck.currentStopIndex });
 });
 
-// PATCH /api/trucks/:id/status-location (update status and/or liveLocation)
 exports.updateStatusLocation = asyncHandler(async (req, res) => {
   const { status, liveLocation } = req.body || {};
   const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
-  // Permission: admin or manager of truck
   if (req.user.role === 'manager') {
     if (!truck.manager || truck.manager.id !== req.user.id) {
       return res.status(403).json({ success: false, error: { message: 'Not manager of this truck' } });
@@ -416,12 +367,10 @@ exports.updateStatusLocation = asyncHandler(async (req, res) => {
   if (normalizedExisting) truck.status = normalizedExisting;
   await truck.save();
   try { emitTruckLocation(truck.id, truck.liveLocation, truck.status, truck.currentStopIndex); } catch { }
-  try { await cacheDelByPrefix('trucks:'); } catch { }
   res.json({ success: true, data: { id: truck.id, status: truck.status, liveLocation: truck.liveLocation } });
   emitTruckUpdate(truck.id, { status: truck.status, liveLocation: truck.liveLocation });
 });
 
-// POST /api/trucks/:id/start-route (admin/manager)
 exports.startRoute = asyncHandler(async (req, res) => {
   const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
@@ -434,9 +383,7 @@ exports.startRoute = asyncHandler(async (req, res) => {
   }
 
   const normalizedRoutePlan = normalizeRoutePlan(truck.routePlan);
-  if (!normalizedRoutePlan) {
-    return res.status(422).json({ success: false, error: { message: 'Truck route must have at least 2 valid stops' } });
-  }
+  if (!normalizedRoutePlan) return res.status(422).json({ success: false, error: { message: 'Truck route must have at least 2 valid stops' } });
   truck.routePlan = normalizedRoutePlan;
   truck.currentStopIndex = clampStopIndex(truck.currentStopIndex, normalizedRoutePlan.stops);
   truck.status = 'MOVING';
@@ -446,11 +393,9 @@ exports.startRoute = asyncHandler(async (req, res) => {
     if (!truck.location) truck.location = location;
   }
   await truck.save();
-  try { await cacheDelByPrefix('trucks:'); } catch { }
   res.json({ success: true, data: { id: truck.id, status: truck.status, currentStopIndex: truck.currentStopIndex } });
 });
 
-// POST /api/trucks/:id/advance-route (admin/manager)
 exports.advanceRoute = asyncHandler(async (req, res) => {
   const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
@@ -463,9 +408,7 @@ exports.advanceRoute = asyncHandler(async (req, res) => {
   }
 
   const normalizedRoutePlan = normalizeRoutePlan(truck.routePlan);
-  if (!normalizedRoutePlan) {
-    return res.status(422).json({ success: false, error: { message: 'Truck route must have at least 2 valid stops' } });
-  }
+  if (!normalizedRoutePlan) return res.status(422).json({ success: false, error: { message: 'Truck route must have at least 2 valid stops' } });
   const stops = normalizedRoutePlan.stops;
   const currentIndex = clampStopIndex(truck.currentStopIndex, stops);
 
@@ -488,12 +431,10 @@ exports.advanceRoute = asyncHandler(async (req, res) => {
   }
   truck.routePlan = normalizedRoutePlan;
   await truck.save();
-  try { await cacheDelByPrefix('trucks:'); } catch { }
   res.json({ success: true, data: { id: truck.id, status: truck.status, currentStopIndex: truck.currentStopIndex } });
   emitTruckUpdate(truck.id, { status: truck.status, currentStopIndex: truck.currentStopIndex });
 });
 
-// POST /api/trucks/:id/stop-route (admin/manager)
 exports.stopRoute = asyncHandler(async (req, res) => {
   const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
@@ -504,60 +445,41 @@ exports.stopRoute = asyncHandler(async (req, res) => {
   } else if (req.user.role !== 'admin') {
     return res.status(403).json({ success: false, error: { message: 'Forbidden' } });
   }
-
   truck.status = 'CLOSED';
   await truck.save();
-  try { await cacheDelByPrefix('trucks:'); } catch { }
   res.json({ success: true, data: { id: truck.id, status: truck.status } });
   emitTruckUpdate(truck.id, { status: truck.status });
 });
 
-// PATCH /api/trucks/force-serving (admin only)
 exports.forceAllServing = asyncHandler(async (req, res) => {
   const result = await Truck.updateMany({}, { status: 'SERVING', isActive: true });
-  try { await cacheDelByPrefix('trucks:'); } catch { }
-  res.json({
-    success: true,
-    data: {
-      matched: result.matchedCount || result.n,
-      modified: result.modifiedCount || result.nModified
-    }
-  });
+  res.json({ success: true, data: { matched: result.matchedCount || result.n, modified: result.modifiedCount || result.nModified } });
 });
+
 exports.deleteTruck = asyncHandler(async (req, res) => {
   const truck = await Truck.findById(req.params.id).populate('manager', 'id _id');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
 
-  // Permission: admin OR manager of the truck
   if (req.user.role === 'manager') {
     const mgrId = truck.manager ? (truck.manager.id || String(truck.manager._id)) : null;
-    if (!mgrId || mgrId !== String(req.user.id)) {
-      return res.status(403).json({ success: false, error: { message: 'Not manager of this truck' } });
-    }
+    if (!mgrId || mgrId !== String(req.user.id)) return res.status(403).json({ success: false, error: { message: 'Not manager of this truck' } });
   } else if (req.user.role !== 'admin') {
     return res.status(403).json({ success: false, error: { message: 'Forbidden' } });
   }
 
-  const adminOrMgrId = req.user.id;
-
-  // 1) Unassign staff from this truck
-  await User.updateMany(
-    { role: 'staff', assignedTruck: truck._id },
-    { $unset: { assignedTruck: '' }, $set: { lastManager: truck.manager ? (truck.manager._id || truck.manager.id || truck.manager) : adminOrMgrId } }
-  );
-
-  // 2) Delete related menu items
+  await User.updateMany({ role: 'staff', assignedTruck: truck._id }, { $unset: { assignedTruck: '' }, $set: { lastManager: truck.manager ? (truck.manager._id || truck.manager.id || truck.manager) : req.user.id } });
   await MenuItem.deleteMany({ truck: truck._id });
 
-  // 3) Delete Orders and their chat rooms/messages for this truck
   try {
     const orders = await Order.find({ truck: truck._id }).select('_id');
     const orderIds = orders.map(o => o._id);
     if (orderIds.length) {
       const orderRooms = await ChatRoom.find({ type: 'order', order: { $in: orderIds } }).select('_id');
       const orderRoomIds = orderRooms.map(r => r._id);
-      if (orderRoomIds.length) await ChatMessage.deleteMany({ room: { $in: orderRoomIds } });
-      if (orderRoomIds.length) await ChatRoom.deleteMany({ _id: { $in: orderRoomIds } });
+      if (orderRoomIds.length) {
+        await ChatMessage.deleteMany({ room: { $in: orderRoomIds } });
+        await ChatRoom.deleteMany({ _id: { $in: orderRoomIds } });
+      }
       await Order.deleteMany({ _id: { $in: orderIds } });
     }
   } catch { }
@@ -570,12 +492,6 @@ exports.deleteTruck = asyncHandler(async (req, res) => {
   } catch { }
 
   await Truck.deleteOne({ _id: truck._id });
-
-  try {
-    await cacheDelByPrefix('trucks:');
-    await cacheDelByPrefix(`menu:${truck._id}:`);
-  } catch { }
-
   res.json({ success: true, data: { id: String(truck._id), deleted: true } });
   emitTruckDeleted(truck._id);
 });
