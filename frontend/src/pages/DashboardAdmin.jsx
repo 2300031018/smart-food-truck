@@ -22,10 +22,10 @@ export default function DashboardAdmin() {
   const ActiveComponent = tabs.find(t => t.id === activeTab).component;
 
   return (
-    <div style={{ padding: 20, fontFamily: 'system-ui' }}>
+    <div style={{ padding: 20, fontFamily: 'system-ui', background: 'var(--bg-primary)', minHeight: '100vh', color: 'var(--text-primary)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h2 style={{ margin: 0 }}>Admin Console</h2>
-        <span style={{ fontSize: 14, color: '#666' }}>Logged in as {user?.email}</span>
+        <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>Admin Console</h2>
+        <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Logged in as {user?.name || user?.email}</span>
       </div>
 
       <div style={{ display: 'flex', borderBottom: '1px solid #ddd', marginBottom: 20 }}>
@@ -37,8 +37,8 @@ export default function DashboardAdmin() {
               padding: '10px 20px',
               border: 'none',
               background: 'none',
-              borderBottom: activeTab === tab.id ? '2px solid #2563eb' : 'none',
-              color: activeTab === tab.id ? '#2563eb' : '#666',
+              borderBottom: activeTab === tab.id ? '2px solid var(--primary)' : 'none',
+              color: activeTab === tab.id ? 'var(--primary)' : 'var(--text-secondary)',
               fontWeight: activeTab === tab.id ? 600 : 400,
               cursor: 'pointer'
             }}
@@ -48,7 +48,7 @@ export default function DashboardAdmin() {
         ))}
       </div>
 
-      <div style={{ background: '#fff', borderRadius: 8 }}>
+      <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)' }}>
         <ActiveComponent />
       </div>
     </div>

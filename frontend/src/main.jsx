@@ -4,7 +4,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import L from 'leaflet';
 import App from './App';
 import 'leaflet/dist/leaflet.css';
-import './styles/globals.css';
+import './styles/global.css';
 import './styles/dashboard.css';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';

@@ -9,6 +9,24 @@ export function AuthProvider({ children }) {
     return raw ? JSON.parse(raw) : null;
   });
 
+  useEffect(() => {
+    if (token) {
+      // Sync user profile on load/token change
+      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(res => {
+          if (res.success && res.data?.user) {
+            const updatedUser = { ...user, ...res.data.user };
+            setUser(updatedUser);
+            localStorage.setItem('sft_user', JSON.stringify(updatedUser));
+          }
+        })
+        .catch(err => console.warn('User sync failed', err));
+    }
+  }, [token]);
+
   function login(tokenValue, userValue) {
     setToken(tokenValue);
     setUser(userValue);

@@ -27,21 +27,28 @@ function Protected({ children }) {
 
 function HomeRedirect() {
   const { token, user } = useAuth();
-  if (!token) return <Navigate to="/trucks" replace />;
+  if (!token) return <Home />;
+
   const role = user?.role;
-  const dest = role === 'admin' ? '/admin'
-    : role === 'manager' ? '/manager'
-      : role === 'staff' ? '/staff'
-        : '/trucks';
-  return <Navigate to={dest} replace />;
+  if (role === 'admin') return <Navigate to="/admin" replace />;
+  if (role === 'manager') return <Navigate to="/manager" replace />;
+  if (role === 'staff') return <Navigate to="/orders" replace />;
+
+  // Customers/Consumers can stay on Home
+  return <Home />;
 }
+
+import Home from './pages/Home';
 
 export default function App() {
   return (
     <AuthProvider>
       <Layout>
         <Routes>
-          <Route path="/" element={<HomeRedirect />} />
+          <Route path="/" element={
+            <HomeRedirect />
+          } />
+          <Route path="/home" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/trucks" element={<Trucks />} />

@@ -9,7 +9,7 @@ export default function AdminStaff() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
-  const [form, setForm] = useState({ name:'', email:'', password:'', truckId:'' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', truckId: '' });
   const [creating, setCreating] = useState(false);
 
   async function load() {
@@ -40,7 +40,7 @@ export default function AdminStaff() {
       const payload = { name: form.name, email: form.email, password: form.password, truckId: form.truckId };
       const res = await api.createStaff(token, payload);
       if (res.success) {
-        setForm({ name:'', email:'', password:'', truckId:'' });
+        setForm({ name: '', email: '', password: '', truckId: '' });
         await load();
       }
     } catch (e) {
@@ -91,7 +91,7 @@ export default function AdminStaff() {
     }
   }
 
-  if (!token) return <p style={{ padding:20 }}>Unauthorized</p>;
+  if (!token) return <p style={{ padding: 20 }}>Unauthorized</p>;
   if (user?.role !== 'admin') return <p className="dashboard-container">Forbidden</p>;
 
   return (
@@ -102,11 +102,11 @@ export default function AdminStaff() {
 
       <div className="card">
         <h3>Create Staff</h3>
-        <form onSubmit={submit} className="control-row" style={{ display:'flex', gap:10, alignItems:'center' }}>
-          <input placeholder="Name" value={form.name} onChange={e=> setForm(f => ({ ...f, name:e.target.value }))} required />
-          <input placeholder="Email" type="email" value={form.email} onChange={e=> setForm(f => ({ ...f, email:e.target.value }))} required />
-          <input placeholder="Password" type="password" value={form.password} onChange={e=> setForm(f => ({ ...f, password:e.target.value }))} required />
-          <select value={form.truckId} onChange={e=> setForm(f => ({ ...f, truckId:e.target.value }))} required>
+        <form onSubmit={submit} className="control-row" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <input placeholder="Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+          <input placeholder="Email" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
+          <input placeholder="Password" type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required />
+          <select value={form.truckId} onChange={e => setForm(f => ({ ...f, truckId: e.target.value }))} required>
             <option value="" disabled>Select truck</option>
             {trucks.map(t => (
               <option key={t.id || t._id} value={t.id || t._id}>{t.name}</option>
@@ -119,10 +119,10 @@ export default function AdminStaff() {
       </div>
 
       {loading && <p>Loading staff…</p>}
-      {error && <p style={{ color:'red' }}>{error}</p>}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
 
       {!loading && !error && (
-        <div className="card" style={{ padding:0, overflow:'hidden' }}>
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <table className="data-table">
             <thead>
               <tr>
@@ -136,8 +136,8 @@ export default function AdminStaff() {
             <tbody>
               {staff.map(s => (
                 <tr key={s.id}>
-                  <td>{s.name}</td>
-                  <td>{s.email}</td>
+                  <td><strong>{s.name || s.email}</strong></td>
+                  <td style={{ fontSize: '0.8rem', opacity: 0.7 }}>{s.email}</td>
                   <td>{s.assignedTruck ? (trucks.find(t => String(t.id || t._id) === String(s.assignedTruck))?.name || s.assignedTruck) : '—'}</td>
                   <td>
                     <span className={`badge ${s.isActive === false ? 'badge-red' : 'badge-green'}`}>
@@ -147,7 +147,7 @@ export default function AdminStaff() {
                   <td>
                     <div className="btn-group">
                       <select
-                        style={{ padding:'4px 8px' }}
+                        style={{ padding: '4px 8px' }}
                         value={s.assignedTruck || ''}
                         onChange={e => assignStaff(s.id, e.target.value)}
                         disabled={busyId === s.id}
@@ -160,9 +160,9 @@ export default function AdminStaff() {
                       {s.assignedTruck && (
                         <button className="btn btn-sm btn-danger" onClick={() => unassignStaff(s.id)} disabled={busyId === s.id}>Unassign</button>
                       )}
-                      <button 
+                      <button
                         className={`btn btn-sm ${s.isActive === false ? 'btn-primary' : 'btn-danger'}`}
-                        onClick={() => toggleActive(s.id, s.isActive !== false)} 
+                        onClick={() => toggleActive(s.id, s.isActive !== false)}
                         disabled={busyId === s.id}
                       >
                         {s.isActive === false ? 'Reactivate' : 'Deactivate'}
@@ -172,7 +172,7 @@ export default function AdminStaff() {
                 </tr>
               ))}
               {staff.length === 0 && (
-                <tr><td colSpan={5} style={{ textAlign:'center', padding:20 }}>No staff found.</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 20 }}>No staff found.</td></tr>
               )}
             </tbody>
           </table>

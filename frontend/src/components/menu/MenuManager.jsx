@@ -92,26 +92,6 @@ export default function MenuManager({ truckId }) {
 
   function onEditChange(e) { setEditForm(f => ({ ...f, [e.target.name]: e.target.value })); }
 
-  async function saveEdit(e) {
-    e.preventDefault();
-    try {
-      const payload = { ...editForm, price: Number(editForm.price) };
-      const res = await api.updateMenuItem(token, editingId, payload);
-      if (res && (res.success || res._id)) {
-        // API may return { success: true, data } or the updated item directly
-        const updated = res.data || res;
-        if (groupMode) {
-          // refetch grouped data to ensure category grouping/order is correct
-          const mRes = await api.getMenuItems(truckId, { group: 'category', all: true });
-          if (mRes.success) setGrouped(mRes.data);
-        } else {
-          setItems(items => items.map(it => it._id === editingId ? updated : it));
-        }
-        setEditingId(null);
-      }
-    } catch (err) { alert(err.message); }
-  }
-
   async function saveEditDirect() {
     try {
       const payload = { ...editForm, price: Number(editForm.price) };
@@ -170,101 +150,124 @@ export default function MenuManager({ truckId }) {
   if (!truck) return <p style={{ padding: 20 }}>Truck not found</p>;
 
   return (
-    <div>
-      <h3>Manage Menu – {truck.name}</h3>
-      <div style={{ margin: '8px 0 16px', display: 'flex', gap: 12, alignItems: 'center' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 14 }}>
-          <input type="checkbox" checked={groupMode} onChange={e => setGroupMode(e.target.checked)} /> Group by Category
-        </label>
-        {groupMode && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <CategoryOrderEditor categories={grouped?.categories || []} order={categoryOrder} setOrder={setCategoryOrder} />
-          </div>
-        )}
+    <div className="menu-manager">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <h3 style={{ margin: 0 }}>Manage Menu – {truck.name}</h3>
+        <div className="btn-group">
+          <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: 20 }}>
+            <input type="checkbox" checked={groupMode} onChange={e => setGroupMode(e.target.checked)} />
+            <span>Group by Category</span>
+          </label>
+        </div>
       </div>
-      <form onSubmit={addItem} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-        <input name="name" placeholder="Name" value={form.name} onChange={onChange} required />
-        <input name="price" placeholder="Price" type="number" step="0.01" value={form.price} onChange={onChange} required />
-        <input name="category" placeholder="Category" value={form.category} onChange={onChange} />
-        <input name="prepTime" placeholder="Prep (min)" value={form.prepTime} onChange={onChange} />
-        <button disabled={adding}>{adding ? 'Adding...' : 'Add Item'}</button>
-      </form>
-      {!groupMode && (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={th}>Name</th>
-              <th style={th}>Price (INR)</th>
-              <th style={th}>Category</th>
-              <th style={th}>Prep (min)</th>
-              <th style={th}>Available</th>
-              <th style={th}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map(it => (
-              <tr key={it._id} style={{ borderBottom: '1px solid #ddd' }}>
-                <td style={td}>{editingId === it._id ? (<input name="name" value={editForm.name} onChange={onEditChange} required />) : it.name}</td>
-                <td style={td}>{editingId === it._id ? (<input name="price" type="number" step="0.01" value={editForm.price} onChange={onEditChange} required />) : formatCurrency(it.price)}</td>
-                <td style={td}>{editingId === it._id ? (<input name="category" value={editForm.category} onChange={onEditChange} />) : (it.category || '-')}</td>
-                <td style={td}>{editingId === it._id ? (<input name="prepTime" value={editForm.prepTime} onChange={onEditChange} placeholder="Prep min" />) : (it.prepTime || '-')}</td>
-                <td style={td}>{it.isAvailable ? 'Yes' : 'No'}</td>
-                <td style={td}>
-                  {editingId === it._id ? (
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button type="button" onClick={saveEditDirect}>Save</button>
-                      <button type="button" onClick={() => setEditingId(null)}>Cancel</button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button type="button" onClick={() => startEdit(it)}>Edit</button>
-                      <button type="button" onClick={() => doDelete(it._id)}>Delete</button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      {groupMode && (
+        <div style={{ marginBottom: 24 }}>
+          <CategoryOrderEditor categories={grouped?.categories || []} order={categoryOrder} setOrder={setCategoryOrder} />
+        </div>
       )}
-      {groupMode && grouped && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {grouped.categories.map(cat => {
+
+      <div className="card" style={{ marginBottom: 24, background: 'rgba(255,255,255,0.02)' }}>
+        <h4 style={{ marginTop: 0, marginBottom: 15, fontSize: '0.9rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Add New Menu Item</h4>
+        <form onSubmit={addItem} className="control-row" style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          <input name="name" placeholder="Item Name" value={form.name} onChange={onChange} required style={{ flex: 2, minWidth: 200 }} />
+          <input name="price" placeholder="Price (INR)" type="number" step="0.01" value={form.price} onChange={onChange} required style={{ flex: 1, minWidth: 100 }} />
+          <input name="category" placeholder="Category" value={form.category} onChange={onChange} style={{ flex: 1, minWidth: 120 }} />
+          <input name="prepTime" placeholder="Prep Time (min)" value={form.prepTime} onChange={onChange} style={{ flex: 1, minWidth: 100 }} />
+          <button className="btn btn-primary" disabled={adding} style={{ flex: 0, whiteSpace: 'nowrap' }}>{adding ? 'Adding...' : '+ Add Item'}</button>
+        </form>
+      </div>
+
+      {!groupMode ? (
+        <div style={{ overflow: 'hidden', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Price</th>
+                <th>Category</th>
+                <th>Prep</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(it => (
+                <tr key={it._id}>
+                  <td>{editingId === it._id ? (<input name="name" value={editForm.name} onChange={onEditChange} required style={{ width: '100%' }} />) : <strong>{it.name}</strong>}</td>
+                  <td>{editingId === it._id ? (<input name="price" type="number" step="0.01" value={editForm.price} onChange={onEditChange} required style={{ width: 80 }} />) : formatCurrency(it.price)}</td>
+                  <td>{editingId === it._id ? (<input name="category" value={editForm.category} onChange={onEditChange} style={{ width: 100 }} />) : <span style={{ color: 'var(--text-secondary)' }}>{it.category || '-'}</span>}</td>
+                  <td>{editingId === it._id ? (<input name="prepTime" value={editForm.prepTime} onChange={onEditChange} placeholder="min" style={{ width: 60 }} />) : (it.prepTime ? `${it.prepTime} min` : '-')}</td>
+                  <td>
+                    <span className={`badge ${it.isAvailable ? 'badge-green' : 'badge-red'}`} style={{ cursor: 'pointer' }} onClick={() => toggle(it._id)}>
+                      {it.isAvailable ? 'Available' : 'Sold Out'}
+                    </span>
+                  </td>
+                  <td>
+                    {editingId === it._id ? (
+                      <div className="btn-group">
+                        <button className="btn btn-sm btn-primary" onClick={saveEditDirect}>Save</button>
+                        <button className="btn btn-sm" style={{ background: 'rgba(255,255,255,0.05)' }} onClick={() => setEditingId(null)}>Cancel</button>
+                      </div>
+                    ) : (
+                      <div className="btn-group">
+                        <button className="btn btn-sm" style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8' }} onClick={() => startEdit(it)}>Edit</button>
+                        <button className="btn btn-sm btn-danger" onClick={() => doDelete(it._id)}>Delete</button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {grouped?.categories.map(cat => {
             const isCollapsed = collapsed[cat.name];
             return (
-              <div key={cat.name} style={{ border: '1px solid #e2e2e2', borderRadius: 4 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', cursor: 'pointer', background: '#fafafa', padding: '6px 10px' }} onClick={() => setCollapsed(c => ({ ...c, [cat.name]: !c[cat.name] }))}>
-                  <h3 style={{ margin: 0, fontSize: 16 }}>{cat.name}</h3>
-                  <span style={{ fontSize: 12, opacity: 0.7 }}>{isCollapsed ? '▶' : '▼'}</span>
+              <div key={cat.name} style={{ border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, overflow: 'hidden', background: 'rgba(255,255,255,0.01)' }}>
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', cursor: 'pointer', background: 'rgba(255,255,255,0.03)', padding: '12px 16px', alignItems: 'center' }}
+                  onClick={() => setCollapsed(c => ({ ...c, [cat.name]: !c[cat.name] }))}
+                >
+                  <h4 style={{ margin: 0, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
+                    {cat.name} <span style={{ marginLeft: 8, fontSize: '0.75rem', opacity: 0.5 }}>({cat.items.length} items)</span>
+                  </h4>
+                  <span style={{ fontSize: 10, opacity: 0.5 }}>{isCollapsed ? '▶' : '▼'}</span>
                 </div>
                 {!isCollapsed && (
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <table className="data-table">
                     <thead>
                       <tr>
-                        <th style={th}>Name</th>
-                        <th style={th}>Price (INR)</th>
-                        <th style={th}>Prep (min)</th>
-                        <th style={th}>Available</th>
-                        <th style={th}>Actions</th>
+                        <th>Name</th>
+                        <th>Price</th>
+                        <th>Prep</th>
+                        <th>Status</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {cat.items.map(it => (
-                        <tr key={it._id} style={{ borderBottom: '1px solid #ddd' }}>
-                          <td style={td}>{editingId === it._id ? (<input name="name" value={editForm.name} onChange={onEditChange} required />) : it.name}</td>
-                          <td style={td}>{editingId === it._id ? (<input name="price" type="number" step="0.01" value={editForm.price} onChange={onEditChange} required />) : formatCurrency(it.price)}</td>
-                          <td style={td}>{editingId === it._id ? (<input name="prepTime" value={editForm.prepTime} onChange={onEditChange} placeholder="Prep min" />) : (it.prepTime || '-')}</td>
-                          <td style={td}>{it.isAvailable ? 'Yes' : 'No'}</td>
-                          <td style={td}>
+                        <tr key={it._id}>
+                          <td>{editingId === it._id ? (<input name="name" value={editForm.name} onChange={onEditChange} required style={{ width: '100%' }} />) : <strong>{it.name}</strong>}</td>
+                          <td>{editingId === it._id ? (<input name="price" type="number" step="0.01" value={editForm.price} onChange={onEditChange} required style={{ width: 80 }} />) : formatCurrency(it.price)}</td>
+                          <td>{editingId === it._id ? (<input name="prepTime" value={editForm.prepTime} onChange={onEditChange} placeholder="min" style={{ width: 60 }} />) : (it.prepTime ? `${it.prepTime} min` : '-')}</td>
+                          <td>
+                            <span className={`badge ${it.isAvailable ? 'badge-green' : 'badge-red'}`} style={{ cursor: 'pointer' }} onClick={() => toggle(it._id)}>
+                              {it.isAvailable ? 'Available' : 'Sold Out'}
+                            </span>
+                          </td>
+                          <td>
                             {editingId === it._id ? (
-                              <div style={{ display: 'flex', gap: 8 }}>
-                                <button type="button" onClick={saveEditDirect}>Save</button>
-                                <button type="button" onClick={() => setEditingId(null)}>Cancel</button>
+                              <div className="btn-group">
+                                <button className="btn btn-sm btn-primary" onClick={saveEditDirect}>Save</button>
+                                <button className="btn btn-sm" style={{ background: 'rgba(255,255,255,0.05)' }} onClick={() => setEditingId(null)}>Cancel</button>
                               </div>
                             ) : (
-                              <div style={{ display: 'flex', gap: 8 }}>
-                                <button type="button" onClick={() => startEdit(it)}>Edit</button>
-                                <button type="button" onClick={() => doDelete(it._id)}>Delete</button>
+                              <div className="btn-group">
+                                <button className="btn btn-sm" style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8' }} onClick={() => startEdit(it)}>Edit</button>
+                                <button className="btn btn-sm btn-danger" onClick={() => doDelete(it._id)}>Delete</button>
                               </div>
                             )}
                           </td>
@@ -281,9 +284,6 @@ export default function MenuManager({ truckId }) {
     </div>
   );
 }
-
-const th = { textAlign: 'left', padding: 6, background: '#f5f5f5', border: '1px solid #ddd' };
-const td = { padding: 6, border: '1px solid #ddd', fontSize: 14 };
 
 function CategoryOrderEditor({ categories, order, setOrder }) {
   const names = categories.map(c => c.name);
@@ -304,17 +304,19 @@ function CategoryOrderEditor({ categories, order, setOrder }) {
   }
   function addMissing() { setOrder(o => [...o, ...names.filter(n => !o.includes(n))]); }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, background: '#f7f7f7', padding: 8, borderRadius: 4 }}>
-      <strong style={{ fontSize: 13 }}>Category Order</strong>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, background: 'rgba(255,255,255,0.03)', padding: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
+      <strong style={{ fontSize: 12, textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.05em' }}>Category Order</strong>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {cleaned.map(name => (
-          <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#fff', padding: '2px 6px', border: '1px solid #ccc', borderRadius: 4 }}>
+          <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.05)', padding: '4px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6 }}>
             <span>{name}</span>
-            <button type="button" onClick={() => move(name, -1)} style={{ border: '1px solid #bbb', background: '#fafafa', fontSize: 11, padding: '2px 4px' }}>↑</button>
-            <button type="button" onClick={() => move(name, 1)} style={{ border: '1px solid #bbb', background: '#fafafa', fontSize: 11, padding: '2px 4px' }}>↓</button>
+            <div style={{ display: 'flex', gap: 2 }}>
+              <button className="btn btn-sm" type="button" onClick={() => move(name, -1)} style={{ padding: '2px 4px', fontSize: 10 }}>↑</button>
+              <button className="btn btn-sm" type="button" onClick={() => move(name, 1)} style={{ padding: '2px 4px', fontSize: 10 }}>↓</button>
+            </div>
           </div>
         ))}
-        <button type="button" onClick={addMissing} style={{ border: '1px solid #bbb', background: '#fafafa', fontSize: 11, padding: '2px 4px' }}>Add Missing</button>
+        <button className="btn btn-sm btn-primary" type="button" onClick={addMissing} style={{ padding: '4px 10px', fontSize: 11 }}>+ Add Missing</button>
       </div>
     </div>
   );

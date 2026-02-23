@@ -61,18 +61,18 @@ export default function ManagerStaff() {
         <h2>My Staff</h2>
       </div>
 
-      <div className="card" style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div>
-          <label style={{ marginRight: 8, fontWeight: 500 }}>View:</label>
-          <select value={viewFilter} onChange={e => setViewFilter(e.target.value)}>
+      <div className="card" style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap', background: 'var(--bg-secondary)', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <label style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em' }}>View</label>
+          <select value={viewFilter} onChange={e => setViewFilter(e.target.value)} style={{ padding: '6px 12px' }}>
             <option value="active">Active Staff</option>
             <option value="reclaim">Previously Managed (Reclaim)</option>
           </select>
         </div>
         {viewFilter === 'active' && (
-          <div>
-            <label style={{ marginRight: 8, fontWeight: 500 }}>Filter by Truck:</label>
-            <select value={filterTruck} onChange={e => setFilterTruck(e.target.value)}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <label style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Filter by Truck</label>
+            <select value={filterTruck} onChange={e => setFilterTruck(e.target.value)} style={{ padding: '6px 12px' }}>
               <option value="all">All Trucks</option>
               {trucks.map(t => <option key={t._id || t.id} value={t._id || t.id}>{t.name}</option>)}
             </select>
@@ -80,7 +80,7 @@ export default function ManagerStaff() {
         )}
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ padding: 0, overflow: 'visible' }}>
         <table className="data-table">
           <thead>
             <tr>
@@ -98,8 +98,8 @@ export default function ManagerStaff() {
               return (
                 <tr key={id}>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{s.name}</div>
-                    <div style={{ fontSize: 13, color: '#6b7280' }}>{s.email}</div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{s.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', opacity: 0.8 }}>{s.email}</div>
                   </td>
                   <td>
                     {assigned ? (
@@ -110,25 +110,34 @@ export default function ManagerStaff() {
                       <span className="badge badge-yellow">Unassigned</span>
                     )}
                   </td>
-                  <td style={{ position: 'relative' }}>
+                  <td style={{ position: 'relative', zIndex: menuOpen[id] ? 50 : 1 }}>
                     {viewFilter === 'reclaim' || !assigned ? (
                       // Unassigned or reclaim: show Assign action only
                       !open ? (
                         <>
-                          <button style={btn} onClick={() => setMenuOpen(m => ({ ...m, [id]: !m[id] }))}>Assign ▾</button>
+                          <button className="btn btn-sm" style={{ background: 'rgba(255,255,255,0.05)' }} onClick={() => setMenuOpen(m => ({ ...m, [id]: !m[id] }))}>Assign ▾</button>
                           {menuOpen[id] && (
-                            <div style={menuBox}>
-                              <button style={menuItem} onClick={() => { setUiState(u => ({ ...u, [id]: { open: true, target: '' } })); setMenuOpen(m => ({ ...m, [id]: false })); }}>Assign to truck…</button>
+                            <div style={{ ...menuBox, background: 'var(--bg-secondary)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: 'var(--shadow-lg)' }}>
+                              <button style={{ ...menuItem, color: 'var(--text-primary)' }} onClick={() => { setUiState(u => ({ ...u, [id]: { open: true, target: '' } })); setMenuOpen(m => ({ ...m, [id]: false })); }}>Assign to truck…</button>
                             </div>
                           )}
                         </>
                       ) : (
-                        <span>
-                          <select value={target} onChange={e => setUiState(u => ({ ...u, [id]: { ...(u[id] || {}), target: e.target.value } }))}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <select value={target} onChange={e => setUiState(u => ({ ...u, [id]: { ...(u[id] || {}), target: e.target.value } }))} style={{ padding: '4px 8px' }}>
                             <option value="" disabled>Select Truck</option>
                             {trucks.map(t => <option key={t._id || t.id} value={t._id || t.id}>{t.name}</option>)}
                           </select>
-                          <button style={btn} disabled={!!busy[`as:${id}`] || !target} onClick={async () => {
+                          <button 
+                            className="btn btn-sm" 
+                            disabled={!!busy[`as:${id}`] || !target} 
+                            style={{ 
+                              background: !target ? '#cbd5e1' : '#ef4444', 
+                              color: '#fff', 
+                              border: 'none',
+                              cursor: !target ? 'not-allowed' : 'pointer'
+                            }}
+                            onClick={async () => {
                             if (!target) return;
                             setBusy(b => ({ ...b, [`as:${id}`]: true }));
                             try {
@@ -147,23 +156,27 @@ export default function ManagerStaff() {
                               setUiState(u => ({ ...u, [id]: { open: false, target: '' } }));
                             } catch (e) { alert(e.message); } finally { setBusy(b => ({ ...b, [`as:${id}`]: false })); }
                           }}>Assign</button>
-                          <button style={btn} onClick={() => setUiState(u => ({ ...u, [id]: { open: false, target: '' } }))}>Cancel</button>
-                        </span>
+                          <button 
+                            className="btn btn-sm" 
+                            style={{ background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }} 
+                            onClick={() => setUiState(u => ({ ...u, [id]: { open: false, target: '' } }))}
+                          >Cancel</button>
+                        </div>
                       )
                     ) : (
                       // Assigned: Manage dropdown groups Move and Unassign
                       !open ? (
                         <>
-                          <button style={btn} onClick={() => setMenuOpen(m => ({ ...m, [id]: !m[id] }))}>Manage ▾</button>
+                          <button className="btn btn-sm" style={{ background: 'rgba(255,255,255,0.05)' }} onClick={() => setMenuOpen(m => ({ ...m, [id]: !m[id] }))}>Manage ▾</button>
                           {menuOpen[id] && (
-                            <div style={menuBox}>
-                              <button style={menuItem} onClick={() => {
+                            <div style={{ ...menuBox, background: 'var(--bg-secondary)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: 'var(--shadow-lg)' }}>
+                              <button style={{ ...menuItem, color: 'var(--text-primary)' }} onClick={() => {
                                 setEditingStaff(s);
                                 setEditForm({ name: s.name, staffRole: s.staffRole || 'general' });
                                 setMenuOpen(m => ({ ...m, [id]: false }));
                               }}>Edit Details…</button>
-                              <button style={menuItem} onClick={() => { setUiState(u => ({ ...u, [id]: { open: true, target: '' } })); setMenuOpen(m => ({ ...m, [id]: false })); }}>Move…</button>
-                              <button style={menuItem} disabled={!!busy[`un:${id}`]} onClick={async () => {
+                              <button style={{ ...menuItem, color: 'var(--text-primary)' }} onClick={() => { setUiState(u => ({ ...u, [id]: { open: true, target: '' } })); setMenuOpen(m => ({ ...m, [id]: false })); }}>Move…</button>
+                              <button style={{ ...menuItem, color: 'var(--danger)' }} disabled={!!busy[`un:${id}`]} onClick={async () => {
                                 setMenuOpen(m => ({ ...m, [id]: false }));
                                 const truckId = String(s.assignedTruck);
                                 setBusy(b => ({ ...b, [`un:${id}`]: true }));
@@ -178,12 +191,21 @@ export default function ManagerStaff() {
                           )}
                         </>
                       ) : (
-                        <span>
-                          <select value={target} onChange={e => setUiState(u => ({ ...u, [id]: { ...(u[id] || {}), target: e.target.value } }))}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <select value={target} onChange={e => setUiState(u => ({ ...u, [id]: { ...(u[id] || {}), target: e.target.value } }))} style={{ padding: '4px 8px' }}>
                             <option value="" disabled>Move to…</option>
                             {trucks.map(t => <option key={t._id || t.id} value={t._id || t.id}>{t.name}</option>)}
                           </select>
-                          <button style={btn} disabled={!!busy[`mv:${id}`] || !target} onClick={async () => {
+                          <button 
+                            className="btn btn-sm" 
+                            disabled={!!busy[`mv:${id}`] || !target} 
+                            style={{ 
+                              background: !target ? '#cbd5e1' : '#ef4444', 
+                              color: '#fff', 
+                              border: 'none',
+                              cursor: !target ? 'not-allowed' : 'pointer'
+                            }}
+                            onClick={async () => {
                             if (!target) return;
                             setBusy(b => ({ ...b, [`mv:${id}`]: true }));
                             try {
@@ -192,8 +214,12 @@ export default function ManagerStaff() {
                               setUiState(u => ({ ...u, [id]: { open: false, target: '' } }));
                             } catch (e) { alert(e.message); } finally { setBusy(b => ({ ...b, [`mv:${id}`]: false })); }
                           }}>Apply</button>
-                          <button style={btn} onClick={() => setUiState(u => ({ ...u, [id]: { open: false, target: '' } }))}>Close</button>
-                        </span>
+                          <button 
+                            className="btn btn-sm" 
+                            style={{ background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }} 
+                            onClick={() => setUiState(u => ({ ...u, [id]: { open: false, target: '' } }))}
+                          >Close</button>
+                        </div>
                       )
                     )}
                   </td>
@@ -205,39 +231,51 @@ export default function ManagerStaff() {
       </div>
 
       {editingStaff && (
-        <div style={modalOverlay}>
-          <div style={modalContent}>
-            <h3 style={{ marginTop: 0 }}>Edit Staff Member</h3>
-            <div style={{ marginBottom: 12 }}>
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, backdropFilter: 'blur(5px)'
+        }}>
+          <div className="card" style={{ width: 450, maxWidth: '90%', animation: 'fadeIn 0.2s', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <h3 style={{ marginTop: 0, marginBottom: 20, fontSize: 18 }}>Edit Staff Member</h3>
+            
+            <div style={{ marginBottom: 16 }}>
               <label style={labelStyle}>Full Name</label>
               <input
-                style={inputStyle}
+                type="text"
+                className="form-control"
                 value={editForm.name}
                 onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                style={{ width: '100%' }}
               />
             </div>
-            <div style={{ marginBottom: 16 }}>
+
+            <div style={{ marginBottom: 24 }}>
               <label style={labelStyle}>Staff Role</label>
               <select
-                style={inputStyle}
+                className="form-control"
                 value={editForm.staffRole}
                 onChange={e => setEditForm(prev => ({ ...prev, staffRole: e.target.value }))}
+                style={{ width: '100%' }}
               >
+                <option value="general">General</option>
                 <option value="cook">Cook</option>
                 <option value="cashier">Cashier</option>
                 <option value="server">Server</option>
-                <option value="general">General</option>
               </select>
             </div>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
               <button
-                style={btn}
+                className="btn"
+                style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', border: '1px solid rgba(255,255,255,0.1)' }}
                 onClick={() => setEditingStaff(null)}
               >
                 Cancel
               </button>
               <button
-                style={{ ...btn, background: '#3b82f6', color: 'white', border: 'none' }}
+                className="btn btn-primary"
+                style={{ background: '#3b82f6', color: '#fff' }}
                 disabled={busy[`edit:${editingStaff.id}`]}
                 onClick={async () => {
                   const id = editingStaff.id;
@@ -266,10 +304,10 @@ export default function ManagerStaff() {
 const th = { textAlign: 'left', padding: 8, background: '#f5f5f5', border: '1px solid #ddd' };
 const td = { padding: 8, border: '1px solid #eee' };
 const btn = { padding: '4px 8px', marginRight: 6 };
-const menuBox = { position: 'absolute', zIndex: 10, background: '#fff', border: '1px solid #ddd', borderRadius: 6, boxShadow: '0 4px 10px rgba(0,0,0,0.06)', padding: 6, display: 'flex', flexDirection: 'column', minWidth: 160 };
-const menuItem = { textAlign: 'left', padding: '6px 8px', background: 'transparent', border: 'none', cursor: 'pointer' };
+const menuBox = { position: 'absolute', zIndex: 200, right: 0, top: '100%', borderRadius: 8, padding: 6, display: 'flex', flexDirection: 'column', minWidth: 180, background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' };
+const menuItem = { textAlign: 'left', padding: '8px 12px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, borderRadius: 4 };
 
-const modalOverlay = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 };
-const modalContent = { background: '#fff', padding: 24, borderRadius: 8, width: '100%', maxWidth: 400, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' };
-const labelStyle = { display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 4 };
-const inputStyle = { width: '100%', padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14 };
+const modalOverlay = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' };
+const modalContent = { background: 'var(--bg-secondary)', padding: 30, borderRadius: 16, width: '100%', maxWidth: 450, boxShadow: 'var(--shadow-xl)', border: '1px solid rgba(255,255,255,0.1)' };
+const labelStyle = { display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' };
+const inputStyle = { width: '100%' };

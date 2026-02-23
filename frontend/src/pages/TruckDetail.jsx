@@ -1,29 +1,34 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { formatCurrency } from '../utils/currency';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import MapEmbed from '../components/MapEmbed';
 import { useSocketRooms } from '../hooks/useSocketRooms';
+import { formatCurrency } from '../utils/currency';
+import gsap from 'gsap';
 
 export default function TruckDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { token, user } = useAuth();
+
+  // Data State
   const [truck, setTruck] = useState(null);
-  const [locBusy, setLocBusy] = useState(false);
-  const [locError, setLocError] = useState(null);
-  const [autoUpdate, setAutoUpdate] = useState(false);
-  const [locForm, setLocForm] = useState({ lat: '', lng: '' });
+  const [menu, setMenu] = useState([]);
   const [recs, setRecs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [menu, setMenu] = useState([]);
-  const [cart, setCart] = useState({}); // itemId -> quantity
+
+  // Interaction State
+  const [cart, setCart] = useState({});
   const [notes, setNotes] = useState('');
   const [ordering, setOrdering] = useState(false);
-  const watchIdRef = useRef(null);
+  const [locBusy, setLocBusy] = useState(false);
 
+  const heroRef = useRef(null);
+  const menuRef = useRef(null);
+
+  // Initial Fetch
   useEffect(() => {
     let mounted = true;
     Promise.all([
@@ -36,13 +41,29 @@ export default function TruckDetail() {
         if (menuRes.success) setMenu(menuRes.data);
         if (recRes.success) setRecs(recRes.data);
       }
-    }).catch(err => setError(err.message))
-      .finally(() => setLoading(false));
+    }).catch(err => mounted && setError(err.message))
+      .finally(() => mounted && setLoading(false));
 
     return () => { mounted = false; };
   }, [id]);
 
-  // Restore cart from localStorage on mount (for persistent guest flow)
+  // Animations
+  useEffect(() => {
+    if (!loading && truck) {
+      gsap.fromTo(heroRef.current,
+        { opacity: 0, y: 30 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }
+      );
+      if (menuRef.current) {
+        gsap.fromTo(menuRef.current.children,
+          { opacity: 0, y: 20 },
+          { opacity: 1, y: 0, duration: 0.5, stagger: 0.1, ease: "power2.out", delay: 0.2 }
+        );
+      }
+    }
+  }, [loading, truck]);
+
+  // Restore Cart
   useEffect(() => {
     try {
       const saved = localStorage.getItem('sft_pending_order');
@@ -51,140 +72,77 @@ export default function TruckDetail() {
         if (truckId === id) {
           setCart(savedCart || {});
           setNotes(savedNotes || '');
-          // Clear it so it doesn't persist forever
           localStorage.removeItem('sft_pending_order');
         }
       }
     } catch (e) { console.warn('Failed to restore cart', e); }
   }, [id]);
-  const rooms = useMemo(() => (id ? [`truck:${id}`] : []), [id]);
+
+  // Socket Logic
   const handleLocation = useCallback((payload) => {
-    if (!payload?.truckId) return;
-    setTruck(prev => {
-      const currentId = prev?.id || prev?._id || id;
-      if (payload.truckId !== currentId) return prev;
-      return {
-        ...(prev || {}),
-        liveLocation: payload.liveLocation,
-        status: payload.status ?? prev?.status,
-        currentStopIndex: Number.isFinite(payload.currentStopIndex) ? payload.currentStopIndex : prev?.currentStopIndex
-      };
-    });
-  }, [id]);
-  const listeners = useMemo(() => ({ 'truck:location': handleLocation }), [handleLocation]);
-  useSocketRooms({ token, rooms, listeners, enabled: Boolean(token && id) });
-
-  useEffect(() => {
-    return () => {
-      if (watchIdRef.current && navigator.geolocation) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const lat = truck?.liveLocation?.lat ?? truck?.location?.lat;
-    const lng = truck?.liveLocation?.lng ?? truck?.location?.lng;
-    setLocForm({ lat: (typeof lat === 'number' ? String(lat) : ''), lng: (typeof lng === 'number' ? String(lng) : '') });
-  }, [truck?.liveLocation?.lat, truck?.liveLocation?.lng, truck?.location?.lat, truck?.location?.lng]);
-
-  if (loading) return <p style={{ padding: 20 }}>Loading...</p>;
-  if (error) return <p style={{ padding: 20, color: 'red' }}>{error}</p>;
-  if (!truck) return <p style={{ padding: 20 }}>Truck not found.</p>;
-
-  const isManagerOfTruck = token && user?.role === 'manager' && truck?.manager && (truck.manager.id === user.id || truck.manager.id === user._id);
-  const canManageMenu = token && (user?.role === 'admin' || isManagerOfTruck);
-  const canUpdateLocation = token && (user?.role === 'admin' || isManagerOfTruck);
-
-  async function sendLiveLocation(lat, lng) {
-    try {
-      const res = await api.updateTruckStatusLocation(token, id, { liveLocation: { lat, lng } });
-      if (res.success) {
-        setTruck(t => ({ ...t, liveLocation: res.data.liveLocation }));
-      }
-    } catch (e) { setLocError(e.message); }
-  }
-
-  function updateOnce() {
-    setLocError(null); setLocBusy(true);
-    if (!('geolocation' in navigator)) { setLocError('Geolocation not supported'); setLocBusy(false); return; }
-    navigator.geolocation.getCurrentPosition(async pos => {
-      const { latitude, longitude } = pos.coords;
-      await sendLiveLocation(latitude, longitude);
-      setLocBusy(false);
-    }, err => { setLocError(err.message || 'Failed to get location'); setLocBusy(false); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 });
-  }
-
-  function toggleAuto() {
-    if (!('geolocation' in navigator)) { setLocError('Geolocation not supported'); return; }
-    if (autoUpdate) {
-      if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null; setAutoUpdate(false);
-    } else {
-      setLocError(null);
-      const idw = navigator.geolocation.watchPosition(async pos => {
-        const { latitude, longitude } = pos.coords;
-        await sendLiveLocation(latitude, longitude);
-      }, err => { setLocError(err.message || 'Location error'); }, { enableHighAccuracy: true, maximumAge: 10000 });
-      watchIdRef.current = idw; setAutoUpdate(true);
-    }
-  }
-
-  async function saveManual() {
-    setLocError(null);
-    const lat = Number(locForm.lat); const lng = Number(locForm.lng);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) { setLocError('Enter valid latitude and longitude'); return; }
-    setLocBusy(true);
-    await sendLiveLocation(lat, lng);
-    setLocBusy(false);
-  }
-
-  const addToCart = (item) => {
-    setCart(prev => ({
+    if (!payload?.truckId || payload.truckId !== (truck?.id || truck?._id)) return;
+    setTruck(prev => ({
       ...prev,
-      [item._id]: (prev[item._id] || 0) + 1
+      liveLocation: payload.liveLocation,
+      status: payload.status ?? prev?.status
     }));
+  }, [truck]);
+
+  const listeners = useMemo(() => ({ 'truck:location': handleLocation }), [handleLocation]);
+  const rooms = useMemo(() => (id ? [`truck:${id}`] : []), [id]);
+  useSocketRooms({ token, rooms, listeners, enabled: Boolean(token && id && truck) });
+
+  // Location Updates (Owner/Admin)
+  const canUpdateLocation = token && (user?.role === 'admin' || (truck?.manager && (truck.manager.id === user.id || truck.manager.id === user._id)));
+
+  const updateLocation = () => {
+    if (!('geolocation' in navigator)) return alert('Geolocation not supported');
+    setLocBusy(true);
+    navigator.geolocation.getCurrentPosition(async pos => {
+      try {
+        await api.updateTruckStatusLocation(token, id, {
+          liveLocation: { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        });
+        alert('Location updated!');
+      } catch (e) { console.error(e); }
+      finally { setLocBusy(false); }
+    }, err => { alert(err.message); setLocBusy(false); });
   };
 
-  const removeFromCart = (itemId) => {
-    setCart(prev => {
-      const next = { ...prev };
-      if (next[itemId] > 1) next[itemId]--;
-      else delete next[itemId];
-      return next;
-    });
-  };
-
-  const cartItems = Object.entries(cart).map(([id, qty]) => {
-    const item = menu.find(m => m._id === id);
-    return item ? { ...item, quantity: qty } : null;
-  }).filter(Boolean);
+  // Cart Functions
+  const cartItems = useMemo(() => {
+    return Object.entries(cart).map(([itemId, qty]) => {
+      const item = menu.find(m => m._id === itemId);
+      return item ? { ...item, quantity: qty } : null;
+    }).filter(Boolean);
+  }, [cart, menu]);
 
   const cartTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  const addToCart = (item) => setCart(p => ({ ...p, [item._id]: (p[item._id] || 0) + 1 }));
+  const removeFromCart = (itemId) => setCart(p => {
+    const next = { ...p };
+    if (next[itemId] > 1) next[itemId]--;
+    else delete next[itemId];
+    return next;
+  });
 
   async function handlePlaceOrder() {
     if (!token) {
-      // Guest: Save state and redirect to login
-      const pendingData = { truckId: id, cart, notes, redirect: window.location.pathname };
-      localStorage.setItem('sft_pending_order', JSON.stringify(pendingData));
-      localStorage.setItem('sft_redirect', window.location.pathname);
+      localStorage.setItem('sft_pending_order', JSON.stringify({ truckId: id, cart, notes }));
       return navigate('/login');
     }
-    if (cartItems.length === 0) return;
     setOrdering(true);
     try {
-      const payload = {
+      await api.createOrder(token, {
         truck: id,
         items: cartItems.map(it => ({ menuItem: it._id, quantity: it.quantity })),
         notes
-      };
-      const res = await api.createOrder(token, payload);
-      if (res.success) {
-        alert('Order placed successfully!');
-        setCart({});
-        setNotes('');
-        navigate('/orders');
-      }
+      });
+      setCart({});
+      setNotes('');
+      navigate('/orders');
     } catch (e) {
       alert(e.message || 'Failed to place order');
     } finally {
@@ -192,134 +150,259 @@ export default function TruckDetail() {
     }
   }
 
+  if (loading) return <div className="flex-center" style={{ height: '50vh', color: 'var(--text-secondary)' }}>Loading Truck...</div>;
+  if (error || !truck) return <div className="container" style={{ padding: 20, color: 'var(--danger)' }}>{error || 'Truck not found'}</div>;
+
   return (
-    <div style={{ padding: 20, fontFamily: 'system-ui' }}>
-      <h2>{truck.name}</h2>
-      <MapEmbed
-        height={200}
-        routePlan={truck.routePlan}
-        currentStopIndex={truck.currentStopIndex}
-        status={truck.status}
-        liveLocation={truck.liveLocation || truck.location}
-        truckId={truck.id || truck._id}
-      />
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '6px 0 10px' }}>
-        <a href="#menu-section" style={{ textDecoration: 'none' }}>
-          <button type="button">View Menu</button>
-        </a>
-      </div>
-      <p>{truck.description}</p>
+    <div style={{ paddingBottom: 100, background: 'var(--bg-primary)', minHeight: '100vh' }}>
+      {/* Hero Section */}
+      <div
+        ref={heroRef}
+        style={{
+          background: 'linear-gradient(to bottom, rgba(255,255,255,0.2), var(--bg-primary)), url(/images/hero-bg.png) center/cover no-repeat',
+          padding: '120px 0 80px',
+          borderBottom: '1px solid rgba(0,0,0,0.05)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}
+      >
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'radial-gradient(circle at 50% 50%, rgba(255,255,255,0.7) 0%, var(--bg-primary) 100%)',
+          pointerEvents: 'none'
+        }} />
 
-      {recs.length > 0 && (
-        <div style={{ margin: '15px 0', padding: 12, background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 8 }}>
-          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6, color: '#5b21b6' }}>
-            <span>✨</span> Popular Pairings
-          </div>
-          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
-            {recs.map((r, i) => (
-              <div key={i} style={{ flexShrink: 0, padding: '6px 12px', background: '#fff', border: '1px solid #e9d5ff', borderRadius: 20, fontSize: 13, color: '#6d28d9', fontWeight: 500 }}>
-                {r.name}
+        <div className="container" style={{ position: 'relative', zIndex: 2 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 60 }}>
+            <div style={{ flex: 1, minWidth: 350 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                <span style={{
+                  background: ['SERVING', 'OPEN'].includes(truck.status) ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                  color: ['SERVING', 'OPEN'].includes(truck.status) ? 'var(--success)' : 'var(--danger)',
+                  padding: '6px 16px',
+                  borderRadius: 30,
+                  fontSize: '0.8rem',
+                  fontWeight: 800,
+                  letterSpacing: '1px',
+                  border: '1px solid currentColor'
+                }}>
+                  {truck.status === 'SERVING' || truck.status === 'OPEN' ? '🟢 SERVING NOW' : '🔴 CLOSED'}
+                </span>
+                {canUpdateLocation && (
+                  <button
+                    onClick={updateLocation}
+                    disabled={locBusy}
+                    style={{
+                      background: 'rgba(0,0,0,0.03)',
+                      color: 'var(--text-primary)',
+                      padding: '6px 16px',
+                      borderRadius: 30,
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      border: '1px solid rgba(0,0,0,0.05)'
+                    }}
+                  >
+                    {locBusy ? 'Updating...' : '📍 Update GPS'}
+                  </button>
+                )}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {canUpdateLocation && (
-        <div style={{ margin: '8px 0 12px', padding: 12, border: '1px solid #e5e7eb', borderRadius: 6, background: '#f9fafb' }}>
-          <div style={{ marginBottom: 6, fontWeight: 600 }}>Live Location</div>
-          <div style={{ fontSize: 13, marginBottom: 8 }}>
-            {(() => {
-              const live = truck?.liveLocation;
-              const base = truck?.location;
-              const lat = typeof live?.lat === 'number' ? live.lat : (typeof base?.lat === 'number' ? base.lat : null);
-              const lng = typeof live?.lng === 'number' ? live.lng : (typeof base?.lng === 'number' ? base.lng : null);
-              return (
-                <>
-                  Current: {lat !== null && lng !== null ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : '—'}
-                </>
-              );
-            })()}
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button type="button" onClick={updateOnce} disabled={locBusy}>{locBusy ? 'Updating…' : 'Update to my location'}</button>
-            <button type="button" onClick={toggleAuto}>{autoUpdate ? 'Stop auto-update' : 'Auto-update from my device'}</button>
-          </div>
-          <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <input placeholder="Latitude" value={locForm.lat} onChange={e => setLocForm(f => ({ ...f, lat: e.target.value }))} style={{ width: 140 }} />
-            <input placeholder="Longitude" value={locForm.lng} onChange={e => setLocForm(f => ({ ...f, lng: e.target.value }))} style={{ width: 140 }} />
-            <button type="button" onClick={saveManual} disabled={locBusy}>Save location</button>
-          </div>
-          {locError && <div style={{ color: '#b91c1c', fontSize: 12, marginTop: 6 }}>{locError}</div>}
-          {truck?.liveLocation && <div style={{ fontSize: 11, opacity: .7, marginTop: 6 }}>Last updated: {truck.liveLocation.updatedAt ? new Date(truck.liveLocation.updatedAt).toLocaleString() : 'now'}</div>}
-        </div>
-      )}
-      <h3 id="menu-section">Menu</h3>
-      <div style={{ display: 'grid', gap: 12, marginBottom: 20 }}>
-        {menu.map(item => (
-          <div key={item._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', border: '1px solid #eee', borderRadius: 8, background: item.isAvailable ? '#fff' : '#f9fafb', opacity: item.isAvailable ? 1 : 0.7 }}>
-            <div>
-              <div style={{ fontWeight: 600, color: item.isAvailable ? '#000' : '#666' }}>
-                {item.name} {!item.isAvailable && <span style={{ fontSize: 10, background: '#fee2e2', color: '#dc2626', padding: '2px 6px', borderRadius: 4, marginLeft: 6, textTransform: 'uppercase' }}>Sold Out</span>}
+              <h1 className="text-gradient" style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', marginBottom: 20, lineHeight: 1, fontWeight: 900 }}>{truck.name}</h1>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', maxWidth: 650, lineHeight: 1.8, marginBottom: 32, fontWeight: 500 }}>{truck.description}</p>
+
+              <div style={{ display: 'flex', gap: 24 }}>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Cuisine</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>{truck.cuisine || 'Street Gourmet'}</div>
+                </div>
+                <div style={{ width: 1, background: '#e2e8f0' }} />
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>Wait Time</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 701, color: '#0f172a' }}>~15 Mins</div>
+                </div>
               </div>
-              <div style={{ fontSize: 13, color: '#666' }}>{formatCurrency(item.price)}{item.category ? ` · ${item.category}` : ''}</div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {item.isAvailable ? (
-                cart[item._id] ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f3f4f6', padding: '4px 8px', borderRadius: 6 }}>
-                    <button onClick={() => removeFromCart(item._id)} style={miniBtn}>-</button>
-                    <span style={{ fontWeight: 600, minWidth: 20, textAlign: 'center' }}>{cart[item._id]}</span>
-                    <button onClick={() => addToCart(item)} style={miniBtn}>+</button>
+
+            <div style={{ width: '100%', maxWidth: 500, height: 320, borderRadius: 24, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'var(--shadow-lg)', position: 'relative' }}>
+              <MapEmbed
+                height={320}
+                routePlan={truck.routePlan}
+                currentStopIndex={truck.currentStopIndex}
+                status={truck.status}
+                liveLocation={truck.liveLocation || truck.location}
+                truckId={truck.id || truck._id}
+                rounded={false}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container" style={{ marginTop: 60 }}>
+
+        {/* Recommendations */}
+        {recs.length > 0 && (
+          <div style={{ marginBottom: 60 }}>
+            <h3 style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12, fontSize: '1.5rem', fontWeight: 800 }}>
+              <span style={{ fontSize: '1.5rem' }}>✨</span> Chefs Choice
+            </h3>
+            <div style={{ display: 'flex', gap: 20, overflowX: 'auto', paddingBottom: 15 }}>
+              {recs.map(r => {
+                const item = menu.find(m => m.name === r.name);
+                if (!item) return null;
+                return (
+                  <div
+                    key={r.name}
+                    className="glass-panel"
+                    style={{
+                      minWidth: 260,
+                      padding: 24,
+                      cursor: 'pointer',
+                      border: '1px solid rgba(0,0,0,0.03)'
+                    }}
+                    onClick={() => addToCart(item)}
+                  >
+                    <div style={{ fontWeight: 800, color: 'var(--primary)', marginBottom: 8, fontSize: '1.1rem' }}>{r.name}</div>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Tap to add pairing +</div>
                   </div>
-                ) : (
-                  <button onClick={() => addToCart(item)}>Add</button>
-                )
-              ) : (
-                <button disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>Unavailable</button>
-              )}
+                );
+              })}
             </div>
           </div>
-        ))}
-      </div>
+        )}
 
-      {cartItems.length > 0 && (
-        <div style={{ marginTop: 20, padding: 16, border: '1px solid #ddd6fe', borderRadius: 8, background: '#fdfcfe' }}>
-          <h4 style={{ margin: '0 0 12px 0' }}>Your Order</h4>
-          {cartItems.map(item => (
-            <div key={item._id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 6 }}>
-              <span>{item.name} x {item.quantity}</span>
-              <span>{formatCurrency(item.price * item.quantity)}</span>
+        {/* Menu Grid */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 40, borderBottom: '1px solid #e2e8f0', paddingBottom: 20 }}>
+          <h2 style={{ fontSize: '2.5rem', fontWeight: 900, color: '#0f172a' }}>Full Menu</h2>
+          <div style={{ fontSize: '1rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{menu.length} Items Available</div>
+        </div>
+
+        <div
+          ref={menuRef}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+            gap: 30
+          }}
+        >
+          {menu.map(item => (
+            <div
+              key={item._id}
+              className="glass-panel"
+              style={{
+                borderRadius: 24,
+                opacity: item.isAvailable ? 1 : 0.6,
+                padding: 32,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                border: '1px solid rgba(0,0,0,0.04)',
+                minHeight: 240
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <h3 style={{ fontSize: '1.4rem', margin: 0, fontWeight: 800, color: '#0f172a' }}>{item.name}</h3>
+                  <span style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--primary)' }}>{formatCurrency(item.price)}</span>
+                </div>
+
+                <p style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginBottom: 24, lineHeight: 1.6, fontWeight: 500 }}>
+                  {item.category || 'Kitchen Specialty'} &bull; Crafted Fresh
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {!item.isAvailable ? (
+                  <span style={{ color: 'var(--danger)', fontSize: '0.85rem', fontWeight: 800, background: 'rgba(239, 68, 68, 0.05)', padding: '6px 16px', borderRadius: 20 }}>SOLD OUT FOR TODAY</span>
+                ) : (
+                  cart[item._id] ? (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 20,
+                      background: 'rgba(0,0,0,0.03)',
+                      border: '1px solid rgba(0,0,0,0.05)',
+                      borderRadius: 50,
+                      padding: '8px 16px'
+                    }}>
+                      <button onClick={() => removeFromCart(item._id)} style={{ color: 'var(--text-secondary)', fontSize: '1.6rem', padding: '0 5px', background: 'transparent', fontWeight: 800 }}>&minus;</button>
+                      <span style={{ fontWeight: 800, color: '#0f172a', minWidth: 20, textAlign: 'center', fontSize: '1.1rem' }}>{cart[item._id]}</span>
+                      <button onClick={() => addToCart(item)} style={{ color: 'var(--primary)', fontSize: '1.6rem', padding: '0 5px', background: 'transparent', fontWeight: 800 }}>+</button>
+                    </div>
+                  ) : (
+                    <button
+                      className="btn-primary"
+                      onClick={() => addToCart(item)}
+                      style={{ padding: '10px 24px', fontSize: '0.95rem', width: '100%' }}
+                    >
+                      Add to Order
+                    </button>
+                  )
+                )}
+              </div>
             </div>
           ))}
-          <div style={{ borderTop: '1px solid #eee', margin: '10px 0', paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-            <span>Total</span>
-            <span>{formatCurrency(cartTotal)}</span>
-          </div>
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 500 }}>Notes for the truck</label>
-            <textarea
-              placeholder="Any special instructions?"
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #ddd', fontSize: 13, height: 60 }}
-            />
-          </div>
-          <button
-            onClick={handlePlaceOrder}
-            disabled={ordering}
-            style={{ width: '100%', padding: '10px', background: '#5b21b6', color: 'white', border: 'none', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}
-          >
-            {ordering ? 'Placing Order...' : `Place Order · ${formatCurrency(cartTotal)}`}
-          </button>
         </div>
-      )}
+      </div>
 
-      {canManageMenu && (
-        <a href={`/trucks/${id}/menu-manage`} style={{ display: 'inline-block', marginTop: 12 }}>Manage Menu</a>
+      {/* Floating Order Bar */}
+      {totalItems > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 30,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '95%',
+            maxWidth: 700,
+            zIndex: 1000
+          }}
+        >
+          <div
+            className="glass-panel"
+            style={{
+              padding: '24px 32px',
+              background: 'rgba(255, 255, 255, 0.95)',
+              border: '1px solid rgba(255, 107, 107, 0.1)',
+              boxShadow: '0 25px 80px rgba(0, 0, 0, 0.15)',
+              borderRadius: 30,
+              backdropFilter: 'blur(30px)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ background: 'var(--primary)', color: '#fff', borderRadius: 12, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16 }}>{totalItems}</div>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0f172a' }}>Review Your Order</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{cartItems.map(it => it.name).join(', ')}</div>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>Subtotal</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--primary)' }}>{formatCurrency(cartTotal)}</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 16 }}>
+              <input
+                placeholder="Allergies or special instructions?"
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                style={{ flex: 1, padding: '14px 24px' }}
+              />
+              <button
+                className="btn-primary"
+                onClick={handlePlaceOrder}
+                disabled={ordering}
+                style={{
+                  padding: '14px 40px',
+                  fontSize: '1rem',
+                  textTransform: 'none'
+                }}
+              >
+                {ordering ? 'Sending...' : 'Confirm Order'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
 }
-
-const miniBtn = { cursor: 'pointer', border: '1px solid #bbb', background: '#fafafa', fontSize: 12, padding: '3px 6px', lineHeight: 1, borderRadius: 4 };
-const chip = { cursor: 'pointer', border: '1px solid #ddd', background: '#f8f8f8', fontSize: 12, padding: '3px 8px', lineHeight: 1.4, borderRadius: 999 };

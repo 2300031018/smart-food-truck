@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 import { useSocketRooms } from '../hooks/useSocketRooms';
+import { formatCurrency } from '../utils/currency';
 
 export default function AdminOrders() {
   const { token, user } = useAuth();
@@ -20,7 +21,7 @@ export default function AdminOrders() {
         api.getTrucks()
       ]);
       if (ordersRes.success) setOrders(ordersRes.data || []);
-      
+
       // Build truck name map
       const nameMap = {};
       if (trucksRes.success) {
@@ -73,45 +74,65 @@ export default function AdminOrders() {
 
   useSocketRooms({ token, rooms, listeners, enabled: Boolean(token && user?.role === 'admin') });
 
-  if (!token) return <p style={{ padding:20 }}>Unauthorized</p>;
-  if (user?.role !== 'admin') return <p style={{ padding:20 }}>Forbidden</p>;
+  if (!token) return <p style={{ padding: 20 }}>Unauthorized</p>;
+  if (user?.role !== 'admin') return <p style={{ padding: 20 }}>Forbidden</p>;
 
   return (
-    <div style={{ padding:20, fontFamily:'system-ui' }}>
-      <h2>Admin • Orders</h2>
-      {loading && <p>Loading orders…</p>}
-      {error && <p style={{ color:'red' }}>{error}</p>}
+    <div className="dashboard-container">
+      <div className="page-header">
+        <h2>Admin • Orders</h2>
+      </div>
+
+      {loading && <p style={{ color: 'var(--text-secondary)' }}>Loading orders…</p>}
+      {error && <div style={{ color: 'var(--danger)', padding: 12, borderRadius: 8, background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', marginBottom: 20 }}>{error}</div>}
 
       {!loading && !error && (
-        <table style={{ width:'100%', borderCollapse:'collapse', marginTop:12 }}>
-          <thead>
-            <tr>
-              <th style={th}>Order</th>
-              <th style={th}>Truck</th>
-              <th style={th}>Total</th>
-              <th style={th}>Status</th>
-              <th style={th}>Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.map(o => {
-              const truckId = typeof o.truck === 'object' ? (o.truck.id || o.truck._id) : o.truck;
-              const truckName = typeof o.truck === 'object' ? o.truck.name : (truckNames[truckId] || shortId(truckId));
-              return (
-                <tr key={o._id} style={{ borderTop:'1px solid #eee' }}>
-                  <td style={td}>{shortId(o._id)}</td>
-                  <td style={td}>{truckName}</td>
-                  <td style={td}>₹{Number(o.total || 0).toFixed(2)}</td>
-                  <td style={td}>{o.status}</td>
-                  <td style={td}>{formatTS(o.createdAt)}</td>
-                </tr>
-              );
-            })}
-            {orders.length === 0 && (
-              <tr><td style={td} colSpan={5}>No orders found.</td></tr>
-            )}
-          </tbody>
-        </table>
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Truck</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Created At</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map(o => {
+                const truckId = typeof o.truck === 'object' ? (o.truck.id || o.truck._id) : o.truck;
+                const truckName = typeof o.truck === 'object' ? o.truck.name : (truckNames[truckId] || shortId(truckId));
+
+                const statusBadgeMap = {
+                  PLACED: 'badge-gray',
+                  ACCEPTED: 'badge-yellow',
+                  PREPARING: 'badge-yellow',
+                  READY: 'badge-green',
+                  COMPLETED: 'badge-green',
+                  CANCELLED: 'badge-red',
+                  DELIVERED: 'badge-green'
+                };
+
+                return (
+                  <tr key={o._id}>
+                    <td><code style={{ color: 'var(--primary)', fontWeight: 600 }}>#{shortId(o._id)}</code></td>
+                    <td><strong>{truckName}</strong></td>
+                    <td style={{ fontWeight: 700 }}>{formatCurrency(o.total || 0)}</td>
+                    <td>
+                      <span className={`badge ${statusBadgeMap[o.status] || 'badge-gray'}`}>
+                        {o.status}
+                      </span>
+                    </td>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{formatTS(o.createdAt)}</td>
+                  </tr>
+                );
+              })}
+              {orders.length === 0 && (
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 30, color: 'var(--text-secondary)' }}>No orders found.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
@@ -132,5 +153,5 @@ function formatTS(ts) {
     return '—';
   }
 }
-const th = { textAlign:'left', padding:6, background:'#f5f5f5', border:'1px solid #ddd', fontSize:12 };
-const td = { padding:6, border:'1px solid #eee', fontSize:13 };
+const th = { textAlign: 'left', padding: 6, background: '#f5f5f5', border: '1px solid #ddd', fontSize: 12 };
+const td = { padding: 6, border: '1px solid #eee', fontSize: 13 };

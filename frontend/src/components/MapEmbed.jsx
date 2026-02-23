@@ -118,7 +118,7 @@ export default function MapEmbed({ zoom = 12, height = 180, rounded = true, rout
 
   return (
     <div style={{ marginTop: 8 }}>
-      <div style={{ border: '1px solid #e5e7eb', borderRadius: rounded ? 8 : 0, overflow: 'hidden' }}>
+      <div style={{ border: 'none', borderRadius: rounded ? 12 : 0, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
         <MapContainer
           center={DEFAULT_CENTER}
           zoom={zoom}
@@ -126,14 +126,24 @@ export default function MapEmbed({ zoom = 12, height = 180, rounded = true, rout
           style={{ width: '100%', height }}
         >
           <TileLayer
-            attribution='&copy; OpenStreetMap contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; OpenStreetMap &copy; CARTO'
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
           />
 
           {/* Route Line */}
           {((roadPaths.length > 0 ? roadPaths : (linePositions.length >= 2 ? [linePositions] : []))).map((positions, idx) => (
             positions.length >= 2 && (
-              <Polyline key={`route-${idx}`} positions={positions} pathOptions={{ color: '#94a3b8', weight: 3, opacity: 0.7, dashArray: '5, 10' }} />
+              <Polyline
+                key={`route-${idx}`}
+                positions={positions}
+                pathOptions={{
+                  color: '#4ecdc4',
+                  weight: 4,
+                  opacity: 0.8,
+                  dashArray: '10, 10',
+                  lineCap: 'round'
+                }}
+              />
             )
           ))}
 
@@ -150,7 +160,22 @@ export default function MapEmbed({ zoom = 12, height = 180, rounded = true, rout
                 weight: 2
               }}
             >
-              <Popup>{s.name || `Stop ${idx + 1}`}</Popup>
+              <Popup>
+                <div style={{ minWidth: 140, padding: 4 }}>
+                  <strong style={{ color: 'var(--primary)', fontSize: '0.9rem', display: 'block', marginBottom: 6 }}>
+                    {s.name || `Stop ${idx + 1}`}
+                  </strong>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    <span>🕒 Stay Duration:</span>
+                    <strong style={{ color: 'var(--text-primary)' }}>{s.waitTime || 15} mins</strong>
+                  </div>
+                  {idx === currentStopIndex && normalizeTruckStatus(status) === 'SERVING' && (
+                    <div style={{ marginTop: 8, fontSize: '0.75rem', color: 'var(--success)', fontWeight: 700 }}>
+                      ✓ CURRENTLY SERVING HERE
+                    </div>
+                  )}
+                </div>
+              </Popup>
             </CircleMarker>
           ))}
 

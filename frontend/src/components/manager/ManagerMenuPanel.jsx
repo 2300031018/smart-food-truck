@@ -18,25 +18,28 @@ export default function ManagerMenuPanel({ trucks = [] }) {
   }, [trucks, selected]);
 
   return (
-    <section style={{ marginTop: 24 }}>
+    <section className="card" style={{ marginTop: 24 }}>
       <h3>Manage Menu</h3>
+      <p style={{ marginBottom: 20, fontSize: 14, color: 'var(--text-secondary)' }}>Select a truck to manage its available menu items and availability.</p>
       {trucks.length === 0 ? (
-        <p>No trucks assigned to you yet.</p>
+        <p style={{ color: 'var(--text-secondary)' }}>No trucks assigned to you yet.</p>
       ) : (
         <>
-          <div style={{ marginBottom: 12 }}>
-            <label>
+          <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <label style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Truck:
-              <select value={selected} onChange={e => setSelected(e.target.value)} style={{ marginLeft: 6 }}>
-                {trucks.map(t => (
-                  <option key={t._id || t.id} value={t._id || t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
             </label>
+            <select value={selected} onChange={e => setSelected(e.target.value)} style={{ minWidth: 200 }}>
+              {trucks.map(t => (
+                <option key={t._id || t.id} value={t._id || t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
           </div>
-          {selected && <MenuManager truckId={selected} />}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 24 }}>
+            {selected && <MenuManager truckId={selected} />}
+          </div>
         </>
       )}
     </section>

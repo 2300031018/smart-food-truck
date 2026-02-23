@@ -68,10 +68,10 @@ export default function AnalyticsDashboard() {
 
     // Main layout
     return (
-        <div style={{ padding: '24px', fontFamily: 'system-ui', background: '#f8fafc', minHeight: '100vh' }}>
+        <div style={{ padding: '24px', fontFamily: 'system-ui', background: 'var(--bg-primary)', minHeight: '100vh', color: 'var(--text-primary)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <h2 style={{ margin: 0, color: '#1e293b' }}>
-                    Analytics & Visualization <span style={{ fontSize: 13, fontWeight: 400, color: '#6366f1' }}>(Powered by Python)</span>
+                <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>
+                    Analytics & Visualization <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--primary)' }}>(Powered by Python)</span>
                 </h2>
 
                 <div style={{ display: 'flex', gap: 12 }}>
@@ -161,28 +161,28 @@ export default function AnalyticsDashboard() {
     );
 }
 
-const emptyChart = { height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', background: '#f1f5f9', borderRadius: 8, fontSize: 13 };
+const emptyChart = { height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', borderRadius: 8, fontSize: 13 };
 
 function Card({ title, value, color }) {
     return (
-        <div style={{ background: '#fff', padding: '20px', borderRadius: 12, boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)', borderLeft: `4px solid ${color}` }}>
-            <div style={{ fontSize: 13, color: '#64748b', fontWeight: 500, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#1e293b' }}>{value}</div>
+        <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: 12, boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)', borderLeft: `4px solid ${color}`, border: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{title}</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>{value}</div>
         </div>
     );
 }
 
 const chartContainer = {
-    background: '#fff',
+    background: 'var(--bg-secondary)',
     padding: '20px',
     borderRadius: 12,
     boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)',
-    border: '1px solid #e2e8f0'
+    border: '1px solid rgba(255,255,255,0.1)'
 };
 
 const chartTitle = {
     margin: '0 0 20px 0',
-    color: '#475569',
+    color: 'var(--text-secondary)',
     fontSize: 15,
     fontWeight: 600
 };

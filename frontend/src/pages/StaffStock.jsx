@@ -54,35 +54,41 @@ export default function StaffStock() {
   if (error) return <p style={{ padding: 20, color: 'red' }}>{error}</p>;
 
   return (
-    <div style={{ padding: 20, fontFamily: 'system-ui' }}>
-      <h2>My Stock – {truck?.name || '—'}</h2>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th style={th}>Name</th>
-            <th style={th}>Category</th>
-            <th style={th}>Available</th>
-            <th style={th}>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map(it => (
-            <tr key={it._id} style={{ borderTop: '1px solid #eee' }}>
-              <td style={td}>{it.name}</td>
-              <td style={td}>{it.category || '-'}</td>
-              <td style={td}>{it.isAvailable ? 'Yes' : 'No'}</td>
-              <td style={td}>
-                <button onClick={() => toggleAvailability(it)} disabled={!!busy[it._id]}>
-                  {busy[it._id] ? 'Updating…' : (it.isAvailable ? 'Mark sold out' : 'Mark in stock')}
-                </button>
-              </td>
+    <div className="dashboard-container">
+      <div className="page-header">
+        <h2>My Stock – <span style={{ color: 'var(--primary)' }}>{truck?.name || '—'}</span></h2>
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Category</th>
+              <th>Availability</th>
+              <th>Action</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {items.map(it => (
+              <tr key={it._id}>
+                <td><strong>{it.name}</strong></td>
+                <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{it.category || '-'}</td>
+                <td>
+                  <span className={`badge ${it.isAvailable ? 'badge-green' : 'badge-red'}`}>
+                    {it.isAvailable ? 'In Stock' : 'Sold Out'}
+                  </span>
+                </td>
+                <td>
+                  <button className={`btn btn-sm ${it.isAvailable ? 'btn-danger' : 'btn-primary'}`} style={{ minWidth: 120 }} onClick={() => toggleAvailability(it)} disabled={!!busy[it._id]}>
+                    {busy[it._id] ? 'Updating…' : (it.isAvailable ? 'Mark Sold Out' : 'Mark In Stock')}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
-
-const th = { textAlign: 'left', padding: 6, background: '#f5f5f5', border: '1px solid #ddd' };
-const td = { padding: 6, border: '1px solid #eee' };
