@@ -5,6 +5,18 @@
     padding: 0;
 }
 
+:root {
+    /* Default variables for Admin/Fallback theme */
+    --primary: #ef4444; /* Clean administrative red/pink used elsewhere or consistent color */
+    /* Actually admin usually uses blue or dark colors, but let's stick to the theme's red for consistency or a standard administrative blue */
+    --primary: #2563eb; /* Standard Admin Blue */
+    --danger: #ef4444;
+    --success: #10b981;
+    --text-primary: #1f293b;
+    --text-secondary: #64748b;
+    --bg-secondary: #ffffff;
+}
+
 /* Default Theme (Light / Admin) */
 body {
     background-color: #f3f4f6;
@@ -30,8 +42,11 @@ body {
     --accent: #ff8e8e;
 
     --success: #10b981;
+    --success-bg: rgba(16, 185, 129, 0.1);
     --warning: #f59e0b;
+    --warning-bg: rgba(245, 158, 11, 0.1);
     --danger: #ef4444;
+    --danger-bg: rgba(239, 68, 68, 0.1);
 
     /* Typography */
     --font-main: 'Outfit', 'Inter', system-ui, sans-serif;

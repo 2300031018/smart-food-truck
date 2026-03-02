@@ -12,7 +12,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const DEFAULT_CENTER = [16.5062, 80.6480];
+// Default to India Center if absolutely no location is provided
+const DEFAULT_CENTER = [20.5937, 78.9629];
 
 function normalizeTruckStatus(status) {
   const key = String(status || '').trim().toUpperCase();

@@ -1,8 +1,8 @@
 const Truck = require('../models/Truck');
 const { emitTruckLocation, emitTruckUpdate } = require('../socket');
 
-const SPEED_KMH = 20;
-const DEFAULT_UPDATE_MS = 5000;
+const SPEED_KMH = 60;
+const DEFAULT_UPDATE_MS = 2000;
 const MIN_MOVE_METERS = 2;
 
 function parseHHMM(value) {
@@ -62,7 +62,49 @@ function ensureLoopStops(stops) {
   return same ? stops : [...stops, { ...first, waitTime: Math.max(0, Number.isFinite(Number(first.waitTime)) ? Number(first.waitTime) : 15) }];
 }
 
-function computePlannedLocation(routePlan, now = new Date()) {
+const backendRouteCache = new Map();
+
+async function fetchRoadPath(from, to) {
+  // Use a reliable OSRM demo server, or fallback to straight line if this fails
+  // Added user-agent as OSRM sometimes blocks generic fetch requests
+  const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+  try {
+    const res = await fetch(url, {
+        headers: {
+            'User-Agent': 'SmartFoodTruck/1.0 (Educational Project)'
+        }
+    });
+    if (!res.ok) {
+        // If 429 Too Many Requests, wait a bit? No, just return null (straight line)
+        // console.warn('OSRM rate limit or error:', res.status);
+        return null;
+    } 
+    const data = await res.json();
+    const coords = data.routes?.[0]?.geometry?.coordinates;
+    if (Array.isArray(coords) && coords.length > 0) {
+      return coords.map(([lng, lat]) => ({ lat, lng }));
+    }
+  } catch (e) {
+    // Suppress heavy logging unless debug needed
+    // console.warn('[Simulator] OSRM Fetch Failed:', e.message);
+  }
+  return null;
+}
+
+function interpolateOnRoad(path, t) {
+  if (!path || path.length < 2) return null;
+  const n = path.length - 1;
+  const segmentIndex = Math.floor(t * n);
+  const localT = (t * n) % 1;
+  const from = path[Math.min(segmentIndex, n - 1)];
+  const to = path[Math.min(segmentIndex + 1, n)];
+  return {
+    lat: from.lat + (to.lat - from.lat) * localT,
+    lng: from.lng + (to.lng - from.lng) * localT
+  };
+}
+
+function computePlannedLocation(routePlan, now = new Date(), cachedRoadPaths = null) {
   const tz = routePlan?.timezone || 'Asia/Kolkata';
   const stops = ensureLoopStops(normalizeStops(routePlan));
   if (stops.length < 2) return null;
@@ -104,6 +146,15 @@ function computePlannedLocation(routePlan, now = new Date()) {
         return { lat: seg.stop.lat, lng: seg.stop.lng, status: 'SERVING', currentStopIndex: seg.stopIndex };
       }
       const t = seg.duration === 0 ? 0 : (elapsed / seg.duration);
+
+      // Try on-road interpolation
+      const roadPath = cachedRoadPaths?.[seg.fromIndex];
+      if (roadPath) {
+        const onRoad = interpolateOnRoad(roadPath, t);
+        if (onRoad) return { ...onRoad, status: 'MOVING', currentStopIndex: seg.toIndex };
+      }
+
+      // Fallback to linear
       return {
         lat: seg.from.lat + (seg.to.lat - seg.from.lat) * t,
         lng: seg.from.lng + (seg.to.lng - seg.from.lng) * t,
@@ -121,12 +172,29 @@ async function updateTruckLocations() {
   const now = new Date();
   const trucks = await Truck.find({
     isActive: true,
-    status: { $in: ['SERVING', 'MOVING'] },
+    status: { $in: ['SERVING', 'MOVING', 'OPEN'] },
     'routePlan.stops.0': { $exists: true }
   }).select('routePlan liveLocation status currentStopIndex');
 
   for (const truck of trucks) {
-    const pos = computePlannedLocation(truck.routePlan, now);
+    const cacheKey = truck.id || String(truck._id);
+    let roadPaths = backendRouteCache.get(cacheKey);
+
+    // Fetch road paths if missing
+    if (!roadPaths) {
+      const stops = normalizeStops(truck.routePlan);
+      if (stops.length >= 2) {
+        const collected = [];
+        for (let i = 0; i < stops.length - 1; i++) {
+          const path = await fetchRoadPath(stops[i], stops[i + 1]);
+          collected.push(path);
+        }
+        roadPaths = collected;
+        backendRouteCache.set(cacheKey, roadPaths);
+      }
+    }
+
+    const pos = computePlannedLocation(truck.routePlan, now, roadPaths);
     if (!pos) continue;
 
     const prev = truck.liveLocation || {};

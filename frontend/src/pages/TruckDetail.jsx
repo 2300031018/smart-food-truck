@@ -177,8 +177,16 @@ export default function TruckDetail() {
             <div style={{ flex: 1, minWidth: 350 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
                 <span style={{
-                  background: ['SERVING', 'OPEN'].includes(truck.status) ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                  color: ['SERVING', 'OPEN'].includes(truck.status) ? 'var(--success)' : 'var(--danger)',
+                  background: ['SERVING', 'OPEN'].includes(truck.status) 
+                    ? 'rgba(16, 185, 129, 0.1)' 
+                    : ['MOVING'].includes(truck.status)
+                      ? 'rgba(59, 130, 246, 0.1)'
+                      : 'rgba(239, 68, 68, 0.1)',
+                  color: ['SERVING', 'OPEN'].includes(truck.status) 
+                    ? 'var(--success)' 
+                    : ['MOVING'].includes(truck.status)
+                      ? '#3b82f6'
+                      : 'var(--danger)',
                   padding: '6px 16px',
                   borderRadius: 30,
                   fontSize: '0.8rem',
@@ -186,7 +194,11 @@ export default function TruckDetail() {
                   letterSpacing: '1px',
                   border: '1px solid currentColor'
                 }}>
-                  {truck.status === 'SERVING' || truck.status === 'OPEN' ? '🟢 SERVING NOW' : '🔴 CLOSED'}
+                  {truck.status === 'SERVING' || truck.status === 'OPEN' 
+                    ? '🟢 SERVING NOW' 
+                    : truck.status === 'MOVING'
+                      ? '🚚 ON THE MOVE'
+                      : '🔴 CLOSED'}
                 </span>
                 {canUpdateLocation && (
                   <button

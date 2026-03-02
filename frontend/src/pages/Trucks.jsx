@@ -343,11 +343,19 @@ export default function Trucks() {
                   fontWeight: 800,
                   padding: '4px 12px',
                   borderRadius: '30px',
-                  background: truck.status === 'SERVING' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0,0,0,0.05)',
-                  color: truck.status === 'SERVING' ? 'var(--success)' : 'var(--text-secondary)',
+                  background: ['SERVING', 'OPEN'].includes(truck.status) 
+                    ? 'rgba(16, 185, 129, 0.1)' 
+                    : truck.status === 'MOVING' 
+                      ? 'rgba(59, 130, 246, 0.1)' 
+                      : 'rgba(239, 68, 68, 0.1)',
+                  color: ['SERVING', 'OPEN'].includes(truck.status) 
+                    ? 'var(--success)' 
+                    : truck.status === 'MOVING' 
+                      ? '#3b82f6' 
+                      : 'var(--danger)',
                   letterSpacing: '0.5px'
                 }}>
-                  {truck.status}
+                  {truck.status === 'MOVING' ? 'ON THE MOVE' : truck.status}
                 </span>
               </div>
 

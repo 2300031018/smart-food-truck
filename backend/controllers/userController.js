@@ -2,8 +2,6 @@ const User = require('../models/User');
 const Truck = require('../models/Truck');
 const asyncHandler = require('../utils/asyncHandler');
 
-// POST /api/users/bootstrap-admin (unauthenticated)
-// Creates first admin OR updates existing admin if BOOTSTRAP_KEY header matches env BOOTSTRAP_KEY
 exports.bootstrapAdmin = asyncHandler(async (req, res) => {
   const { email, password, name } = req.body || {};
   if (!email || !password) {

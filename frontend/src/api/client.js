@@ -63,6 +63,7 @@ export const api = {
   startTruckRoute: (token, id) => request(`/trucks/${id}/start-route`, { method: 'POST', token }),
   advanceTruckRoute: (token, id) => request(`/trucks/${id}/advance-route`, { method: 'POST', token }),
   stopTruckRoute: (token, id) => request(`/trucks/${id}/stop-route`, { method: 'POST', token }),
+  forceServing: (token) => request('/trucks/force-serving', { method: 'PATCH', token }),
   deleteTruck: (token, id) => request(`/trucks/${id}`, { method: 'DELETE', token }),
   getRecommendations: (truckId, currentItems = []) => {
     const qs = currentItems.length > 0 ? `?items=${currentItems.join(',')}` : '';
@@ -88,9 +89,12 @@ export const api = {
   updateOrderStatus: (token, id, status) => request(`/orders/${id}/status`, { method: 'PATCH', body: { status }, token }),
 
   // User creation (hierarchical)
+  bootstrapAdmin: (payload) => request('/users/bootstrap-admin', { method: 'POST', body: payload }),
   createManager: (token, payload) => request('/users/managers', { method: 'POST', body: payload, token }),
   getManagers: (token, { includeInactive = false } = {}) => request(`/users/managers${includeInactive ? '?includeInactive=true' : ''}`, { token }),
   getManagersOverview: (token) => request('/users/managers/overview', { token }),
+  getManagersHierarchy: (token) => request('/users/managers/hierarchy', { token }),
+  getManager: (token, id) => request(`/users/managers/${id}`, { token }),
   deleteManager: (token, id) => request(`/users/managers/${id}`, { method: 'DELETE', token }),
   reactivateManager: (token, id) => request(`/users/managers/${id}/reactivate`, { method: 'PATCH', token }),
   createStaff: (token, payload) => request('/users/staff', { method: 'POST', body: payload, token }),

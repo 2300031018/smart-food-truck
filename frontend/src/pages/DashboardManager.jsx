@@ -250,15 +250,51 @@ export default function DashboardManager() {
                   <div>
                     <h3 style={{ margin: '0 0 8px 0', fontSize: '1.4rem' }}>{t.name}</h3>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                      <div style={{ 
-                        display: 'inline-flex', alignItems: 'center', gap: 6, 
-                        padding: '4px 10px', borderRadius: 20, 
-                        background: t.status === 'OPEN' || t.status === 'SERVING' ? 'var(--success-bg)' : 'rgba(0,0,0,0.05)',
-                        color: t.status === 'OPEN' || t.status === 'SERVING' ? 'var(--success)' : 'var(--text-secondary)',
-                        fontSize: '0.85rem', fontWeight: 600 
-                      }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }}></span>
-                        {t.status}
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <select
+                          value={t.status}
+                          onChange={async (e) => {
+                            const newStatus = e.target.value;
+                            const truckId = t.id || t._id;
+                            // Optimistic update
+                            setTrucks(prev => prev.map(p => (p.id || p._id) === truckId ? { ...p, status: newStatus } : p));
+                            try {
+                              await api.updateTruck(token, truckId, { status: newStatus });
+                            } catch (err) {
+                              alert(err.message);
+                              // Revert on error
+                              api.getManagedTrucks(token).then(d => { if (d.success) setTrucks(d.data); });
+                            }
+                          }}
+                          style={{
+                            appearance: 'none',
+                            border: '1px solid transparent',
+                            padding: '4px 28px 4px 12px',
+                            borderRadius: 20,
+                            background: t.status === 'OPEN' || t.status === 'SERVING' ? 'var(--success-bg)' : '#f1f5f9',
+                            color: t.status === 'OPEN' || t.status === 'SERVING' ? 'var(--success)' : '#64748b',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            outline: 'none',
+                            textAlign: 'center'
+                          }}
+                        >
+                          <option value="OPEN">OPEN</option>
+                          <option value="SERVING">SERVING</option>
+                          <option value="MOVING">MOVING</option>
+                          <option value="CLOSED">CLOSED</option>
+                        </select>
+                        <span style={{
+                          position: 'absolute',
+                          right: 10,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          pointerEvents: 'none',
+                          fontSize: '0.7rem',
+                          color: 'currentColor',
+                          opacity: 0.7
+                        }}>▼</span>
                       </div>
                       <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>📍 {t.location?.address || 'No location set'}</span>
                     </div>

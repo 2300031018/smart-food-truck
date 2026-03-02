@@ -250,14 +250,23 @@ export default function AdminTrucks() {
                     </span>
                   </td>
                   <td>
-                    <button className="btn btn-sm btn-primary" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff' }} onClick={() => setEditingTruck(t)}>Edit Route</button>
+                    <button 
+                      className="btn btn-sm btn-primary" 
+                      onClick={() => setEditingTruck(t)}
+                    >
+                      Edit Route
+                    </button>
                   </td>
                   <td>
                     <div className="btn-group">
-                      <button className={`btn btn-sm ${t.isActive === false ? 'btn-primary' : 'btn-danger'}`} style={{ background: t.isActive === false ? '' : 'rgba(239, 68, 68, 0.1)', color: t.isActive === false ? '' : '#ef4444' }} onClick={() => toggleActive(t.id || t._id, t.isActive !== false)} disabled={busyId === (t.id || t._id)}>
+                      <button 
+                        className={`btn btn-sm ${t.isActive === false ? 'btn-primary' : 'btn-danger'}`} 
+                        onClick={() => toggleActive(t.id || t._id, t.isActive !== false)} 
+                        disabled={busyId === (t.id || t._id)}
+                      >
                         {t.isActive === false ? 'Reactivate' : 'Deactivate'}
                       </button>
-                      <button className="btn btn-sm" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }} onClick={() => deleteTruck(t.id || t._id)} disabled={busyId === (t.id || t._id)}>
+                      <button className="btn btn-sm btn-danger" onClick={() => deleteTruck(t.id || t._id)} disabled={busyId === (t.id || t._id)}>
                         Delete
                       </button>
                     </div>
