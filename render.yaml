@@ -19,8 +19,9 @@ services:
       - key: NODE_VERSION
         value: 20.11.0
 
-  - type: static
-    name: smart-food-truck-frontend
+staticSites:
+  # Frontend Service (Static Site)
+  - name: smart-food-truck-frontend
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
