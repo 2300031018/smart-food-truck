@@ -7,7 +7,6 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "lint": "eslint . --ext .js",
-    "seed": "node seed/seed.js",
     "test": "echo \"No tests yet\" && exit 0"
   },
   "keywords": [],

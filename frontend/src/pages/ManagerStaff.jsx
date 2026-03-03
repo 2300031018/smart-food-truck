@@ -15,9 +15,9 @@ export default function ManagerStaff() {
   // uiState per-person: { open: boolean, target: truckId }
   const [uiState, setUiState] = useState({});
   const [menuOpen, setMenuOpen] = useState({}); // staffId -> boolean
-  const [reclaim, setReclaim] = useState([]);
-  const [editingStaff, setEditingStaff] = useState(null); // { id, name, staffRole }
-  const [editForm, setEditForm] = useState({ name: '', staffRole: '' });
+  const [Reclaim, setReclaim] = useState([]);
+  const [editingStaff, setEditingStaff] = useState(null); // { id, name }
+  const [editForm, setEditForm] = useState({ name: '' });
 
   useEffect(() => {
     if (!token || user?.role !== 'manager') return;
@@ -172,7 +172,7 @@ export default function ManagerStaff() {
                             <div style={{ ...menuBox, background: 'var(--bg-secondary)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: 'var(--shadow-lg)' }}>
                               <button style={{ ...menuItem, color: 'var(--text-primary)' }} onClick={() => {
                                 setEditingStaff(s);
-                                setEditForm({ name: s.name, staffRole: s.staffRole || 'general' });
+                                setEditForm({ name: s.name });
                                 setMenuOpen(m => ({ ...m, [id]: false }));
                               }}>Edit Details…</button>
                               <button style={{ ...menuItem, color: 'var(--text-primary)' }} onClick={() => { setUiState(u => ({ ...u, [id]: { open: true, target: '' } })); setMenuOpen(m => ({ ...m, [id]: false })); }}>Move…</button>
@@ -248,21 +248,6 @@ export default function ManagerStaff() {
                 onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
                 style={{ width: '100%' }}
               />
-            </div>
-
-            <div style={{ marginBottom: 24 }}>
-              <label style={labelStyle}>Staff Role</label>
-              <select
-                className="form-control"
-                value={editForm.staffRole}
-                onChange={e => setEditForm(prev => ({ ...prev, staffRole: e.target.value }))}
-                style={{ width: '100%' }}
-              >
-                <option value="general">General</option>
-                <option value="cook">Cook</option>
-                <option value="cashier">Cashier</option>
-                <option value="server">Server</option>
-              </select>
             </div>
 
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.05)' }}>

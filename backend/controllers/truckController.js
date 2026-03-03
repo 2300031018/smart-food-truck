@@ -250,7 +250,7 @@ exports.unassignManager = asyncHandler(async (req, res) => {
 });
 
 exports.getTruckStaff = asyncHandler(async (req, res) => {
-  const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role').populate('staff', 'id email name role staffRole');
+  const truck = await Truck.findById(req.params.id).populate('manager', 'id email name role').populate('staff', 'id email name role');
   if (!truck) return res.status(404).json({ success: false, error: { message: 'Truck not found' } });
   if (req.user.role === 'manager' && truck.manager && String(truck.manager.id || truck.manager._id || truck.manager) !== String(req.user.id)) {
     return res.status(403).json({ success: false, error: { message: 'Not manager of this truck' } });

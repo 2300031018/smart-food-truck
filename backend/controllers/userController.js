@@ -452,11 +452,11 @@ exports.myTeam = asyncHandler(async (req, res) => {
     if (!staffUser.assignedTruck) {
       return res.json({ success:true, data:{ role: 'staff', assignedTruck: null, staff: [], manager: null, meta: emulateRole ? { emulated: true } : undefined } });
     }
-    const truck = await Truck.findById(staffUser.assignedTruck).populate('manager', 'id name email role').populate('staff', 'id name email role staffRole');
+    const truck = await Truck.findById(staffUser.assignedTruck).populate('manager', 'id name email role').populate('staff', 'id name email role');
     if (!truck) {
       return res.json({ success:true, data:{ role: 'staff', assignedTruck: null, staff: [], manager: null, meta: emulateRole ? { emulated: true } : undefined } });
     }
-    const staff = (truck.staff || []).map(s => ({ id: s.id, name: s.name, email: s.email, role: s.role, staffRole: s.staffRole }));
+    const staff = (truck.staff || []).map(s => ({ id: s.id, name: s.name, email: s.email, role: s.role }));
     const manager = truck.manager ? { id: truck.manager.id, name: truck.manager.name, email: truck.manager.email } : null;
     return res.json({ success:true, data:{ role: 'staff', truck: { id: truck.id, name: truck.name, status: truck.status }, manager, staff, meta: emulateRole ? { emulated: true, targetStaffId } : undefined }});
   }
@@ -468,14 +468,14 @@ exports.myTeam = asyncHandler(async (req, res) => {
       return res.status(404).json({ success:false, error:{ message:'Manager not found' } });
     }
     // Fetch trucks managed by manager
-  const trucks = await Truck.find({ manager: managerUser.id }).select('id name status liveLocation staff').populate('staff', 'id name email role staffRole lastLoginAt');
+  const trucks = await Truck.find({ manager: managerUser.id }).select('id name status liveLocation staff').populate('staff', 'id name email role lastLoginAt');
     const mapped = trucks.map(t => ({
       id: t.id,
       name: t.name,
       status: t.status,
       liveLocation: t.liveLocation || null,
       staffCount: (t.staff||[]).length,
-  staff: (t.staff||[]).map(s => ({ id: s.id, name: s.name, email: s.email, staffRole: s.staffRole, lastLoginAt: s.lastLoginAt || null }))
+  staff: (t.staff||[]).map(s => ({ id: s.id, name: s.name, email: s.email, lastLoginAt: s.lastLoginAt || null }))
     }));
     return res.json({ success:true, data:{ role: 'manager', trucks: mapped, meta: emulateRole ? { emulated: true, targetManagerId } : undefined }});
   }

@@ -133,7 +133,7 @@ export const managerApi = {
   // Move/assign staff by targeting a truck the manager owns
   assignStaffToManagedTruck: (token, truckId, userId) => request(`/trucks/${truckId}/staff`, { method: 'POST', body: { userId }, token }),
   unassignStaffFromManagedTruck: (token, truckId, userId) => request(`/trucks/${truckId}/staff/${userId}`, { method: 'DELETE', token }),
-  // Limited staff update (name, staffRole only)
+  // Limited staff update (name only)
   updateStaffLimited: (token, id, payload) => request(`/users/staff/${id}/manager-update`, { method: 'PATCH', body: payload, token }),
   getManagedTrucks: (token) => request('/trucks/managed', { token }),
   reclaimUnassigned: (token) => request('/users/staff/reclaim', { token }),
