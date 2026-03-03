@@ -16,8 +16,9 @@ services:
         sync: false
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 20.11.0
 
-  # Frontend Service (Static Site)
   - type: static
     name: smart-food-truck-frontend
     rootDir: frontend
@@ -25,7 +26,10 @@ services:
     staticPublishPath: ./dist
     envVars:
       - key: VITE_API_TARGET
-        sync: false
+        fromService:
+          type: web
+          name: smart-food-truck-backend
+          property: url
     routes:
       - type: rewrite
         source: '/*'
