@@ -69,7 +69,7 @@ exports.createStaff = asyncHandler(async (req, res) => {
 
 exports.updateStaff = asyncHandler(async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ success:false, error:{ message:'Forbidden' } });
-  const { name, email, password, staffRole } = req.body || {};
+  const { name, email, password } = req.body || {};
   const staff = await User.findOne({ _id: req.params.id, role: 'staff' });
   if (!staff) return res.status(404).json({ success:false, error:{ message:'Staff not found' } });
   if (email && email !== staff.email) {
@@ -79,16 +79,15 @@ exports.updateStaff = asyncHandler(async (req, res) => {
   }
   if (name) staff.name = name;
   if (password) staff.password = password;
-  if (staffRole) staff.staffRole = staffRole;
   await staff.save();
   res.json({ success:true, data:{ id: staff.id, updated:true } });
 });
 
-// Manager limited staff update (only for their trucks) - name and staffRole only
+// Manager limited staff update (only for their trucks) - name only
 exports.managerUpdateStaffLimited = asyncHandler(async (req, res) => {
   if (req.user.role !== 'manager') return res.status(403).json({ success:false, error:{ message:'Forbidden' } });
-  const { name, staffRole } = req.body || {};
-  if (!name && !staffRole) return res.status(400).json({ success:false, error:{ message:'No fields to update' } });
+  const { name } = req.body || {};
+  if (!name) return res.status(400).json({ success:false, error:{ message:'No fields to update' } });
   const staff = await User.findOne({ _id: req.params.id, role: 'staff' });
   if (!staff) return res.status(404).json({ success:false, error:{ message:'Staff not found' } });
   // Ensure staff belongs to a truck managed by this manager
@@ -98,7 +97,6 @@ exports.managerUpdateStaffLimited = asyncHandler(async (req, res) => {
     return res.status(403).json({ success:false, error:{ message:'Not manager of staff\'s truck' } });
   }
   if (name) staff.name = name;
-  if (staffRole) staff.staffRole = staffRole;
   await staff.save();
   res.json({ success:true, data:{ id: staff.id, updated:true } });
 });

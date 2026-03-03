@@ -13,13 +13,13 @@ const defaultWhitelist = [
   'https://pranavtummalasmartfoodtruck.app'
 ];
 const whitelistOverride = (process.env.CORS_WHITELIST || defaultWhitelist.join(',')).split(',').map(o => o.trim()).filter(Boolean);
-const allowLocalOrigin = origin => typeof origin === 'string' && /https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(origin);
+const allowLocalOrigin = origin => typeof origin === 'string' && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(origin);
 const allowedOrigins = whitelistOverride;
 
 module.exports = {
   cors: {
     origin: function (origin, callback) {
-      if (!origin || allowLocalOrigin(origin) || allowedOrigins.includes(origin)) return callback(null, true);
+      if (!origin || allowLocalOrigin(origin) || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) return callback(null, true);
       console.warn(`[CORS] Blocked origin: ${origin}. Allowed: ${allowedOrigins.join(' | ')}`);
       return callback(new Error('Not allowed by CORS'));
     },

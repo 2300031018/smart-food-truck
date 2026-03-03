@@ -9,8 +9,8 @@ const UserSchema = new mongoose.Schema(
     role: { type: String, enum: ['admin', 'manager', 'staff', 'customer'], default: 'customer', index: true },
     managedTrucks: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Truck' }],
     assignedTruck: { type: mongoose.Schema.Types.ObjectId, ref: 'Truck' },
-    staffRole: { type: String, enum: ['cook', 'cashier', 'server', 'general'], default: 'general' },
-  lastLoginAt: { type: Date },
+    // Simplified: No distinct staff roles (cook, server, etc.)
+    lastLoginAt: { type: Date },
     isActive: { type: Boolean, default: true }
   },
   { timestamps: true }
