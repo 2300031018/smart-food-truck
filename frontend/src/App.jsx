@@ -1,5 +1,5 @@
-import { Routes, Route, Navigate, Suspense } from 'react-router-dom';
-import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { Suspense } from 'react';
 
 // Eagerly loaded (init/auth pages)
 import Login from './pages/Login';
