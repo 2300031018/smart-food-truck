@@ -1,5 +1,9 @@
 // Simple API client wrapper
-const target = import.meta.env.VITE_API_URL || '';
+const rawTarget = import.meta.env.VITE_API_URL || '';
+// Ensure we don't double stack /api if the env var already has it, 
+// but typically env var is just the host (https://backend.com)
+const target = rawTarget.endsWith('/') ? rawTarget.slice(0, -1) : rawTarget;
+// If target has /api at the end, use it as is. Otherwise append /api
 const API_BASE = target ? (target.endsWith('/api') ? target : `${target}/api`) : '/api';
 
 function getHeaders(token, isJson = true) {

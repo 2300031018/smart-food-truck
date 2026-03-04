@@ -4,8 +4,9 @@ let socketInstance = null;
 
 export function getSocket(token) {
   if (socketInstance) return socketInstance;
-  // Prefer explicit backend URL via Vite env; fallback to common dev port swap
-  const url = import.meta.env.VITE_API_TARGET || import.meta.env.VITE_BACKEND_URL || window.location.origin;
+  // Use VITE_API_URL or fallback to window.location.origin
+  // In production, VITE_API_URL should point to the backend (e.g. https://...backend.onrender.com)
+  const url = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_TARGET || window.location.origin;
   socketInstance = io(url, {
     path: '/socket.io',
     autoConnect: true,
