@@ -16,17 +16,18 @@ services:
       - key: CORS_WHITELIST
         sync: false
 
-  # Frontend Service (Static Site)
-  - type: static
+  # Frontend Service (served as Web Service to avoid type issues)
+  - type: web
     name: smart-food-truck-frontend
+    runtime: node
     rootDir: frontend
     buildCommand: npm install && npm run build
-    publishDir: dist
+    startCommand: npx serve -s dist -l $PORT
     envVars:
       - key: VITE_API_URL
         fromService:
           type: web
           name: smart-food-truck-backend
           property: url
-      - key: NODE_VERSION
-        value: 20.12.2
+      - key: NODE_ENV
+        value: production
