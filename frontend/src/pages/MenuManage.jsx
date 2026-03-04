@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useParams } from 'react-router-dom';
-import MenuManager from '../components/menu/MenuManager';
 import { useAuth } from '../context/AuthContext';
+
+// Lazy load heavy menu manager component
+const MenuManager = React.lazy(() => import('../components/menu/MenuManager'));
 
 export default function MenuManage(){
   const { id: truckId } = useParams();
@@ -10,7 +12,9 @@ export default function MenuManage(){
   if (!['admin','manager'].includes(user?.role)) return <p style={{ padding:20 }}>Forbidden: admin/manager only</p>;
   return (
     <div style={{ padding:20, fontFamily:'system-ui' }}>
-      <MenuManager truckId={truckId} />
+      <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Loading menu manager...</div>}>
+        <MenuManager truckId={truckId} />
+      </Suspense>
     </div>
   );
 }

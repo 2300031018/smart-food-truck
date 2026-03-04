@@ -1,9 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
-import AdminTrucks from './AdminTrucks';
-import AdminManagers from './AdminManagers';
-import AdminStaff from './AdminStaff';
-import AdminOrders from './AdminOrders';
+
+// Lazy load tab components
+const AdminTrucks = React.lazy(() => import('./AdminTrucks'));
+const AdminManagers = React.lazy(() => import('./AdminManagers'));
+const AdminStaff = React.lazy(() => import('./AdminStaff'));
+const AdminOrders = React.lazy(() => import('./AdminOrders'));
+
+// Loading component for tabs
+const TabLoader = () => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '500px',
+    color: '#64748b'
+  }}>
+    <div style={{
+      width: '30px',
+      height: '30px',
+      border: '3px solid #e2e8f0',
+      borderTop: '3px solid var(--primary)',
+      borderRadius: '50%',
+      animation: 'spin 0.8s linear infinite'
+    }} />
+  </div>
+);
 
 export default function DashboardAdmin() {
   const { user, token } = useAuth();
@@ -49,7 +71,9 @@ export default function DashboardAdmin() {
       </div>
 
       <div style={{ background: 'var(--bg-secondary)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)' }}>
-        <ActiveComponent />
+        <Suspense fallback={<TabLoader />}>
+          <ActiveComponent />
+        </Suspense>
       </div>
     </div>
   );

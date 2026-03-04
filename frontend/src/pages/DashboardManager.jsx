@@ -1,14 +1,16 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
-import ManagerMenuPanel from '../components/manager/ManagerMenuPanel';
-import RouteEditorModal from '../components/RouteEditorModal';
-import TruckFormModal from '../components/TruckFormModal';
 import { clearRoutePathsForTruck } from '../utils/routePathCache';
 import { useSocketRooms } from '../hooks/useSocketRooms';
-import SmartInsights from '../components/SmartInsights';
-import ForecastPanel from '../components/manager/ForecastPanel';
+
+// Lazy load modal and heavy components
+const ManagerMenuPanel = React.lazy(() => import('../components/manager/ManagerMenuPanel'));
+const RouteEditorModal = React.lazy(() => import('../components/RouteEditorModal'));
+const TruckFormModal = React.lazy(() => import('../components/TruckFormModal'));
+const SmartInsights = React.lazy(() => import('../components/SmartInsights'));
+const ForecastPanel = React.lazy(() => import('../components/manager/ForecastPanel'));
 
 export default function DashboardManager() {
   const { user } = useAuth();
@@ -318,7 +320,9 @@ export default function DashboardManager() {
                 
                 {insightId === tid && (
                   <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--border-color)' }}>
-                    <SmartInsights truckId={tid} token={token} onboardClose={() => setInsightId(null)} />
+                    <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Loading insights...</div>}>
+                      <SmartInsights truckId={tid} token={token} onboardClose={() => setInsightId(null)} />
+                    </Suspense>
                   </div>
                 )}
               </div>
@@ -327,31 +331,39 @@ export default function DashboardManager() {
         </div>
       </div>
 
-      <ManagerMenuPanel trucks={trucks} />
+      <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Loading menu...</div>}>
+        <ManagerMenuPanel trucks={trucks} />
+      </Suspense>
 
       {trucks.length > 0 && (
         <div className="card" style={{ marginTop: 20 }}>
-          <ForecastPanel trucks={trucks} />
+          <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Loading forecast...</div>}>
+            <ForecastPanel trucks={trucks} />
+          </Suspense>
         </div>
       )}
 
       {editingDetails && (
-        <TruckFormModal
-          truck={editingDetails.id || editingDetails._id ? editingDetails : null}
-          token={token}
-          onClose={() => setEditingDetails(null)}
-          onSave={() => api.getManagedTrucks(token).then(d => { if (d.success) setTrucks(d.data); })}
-          onSuccess={(newTruck) => !(editingDetails.id || editingDetails._id) && handleCreateSuccess(newTruck)}
-        />
+        <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Loading form...</div>}>
+          <TruckFormModal
+            truck={editingDetails.id || editingDetails._id ? editingDetails : null}
+            token={token}
+            onClose={() => setEditingDetails(null)}
+            onSave={() => api.getManagedTrucks(token).then(d => { if (d.success) setTrucks(d.data); })}
+            onSuccess={(newTruck) => !(editingDetails.id || editingDetails._id) && handleCreateSuccess(newTruck)}
+          />
+        </Suspense>
       )}
 
       {editingTruck && (
-        <RouteEditorModal
-          truck={editingTruck}
-          token={token}
-          onClose={() => setEditingTruck(null)}
-          onSave={() => api.getManagedTrucks(token).then(d => { if (d.success) setTrucks(d.data); })}
-        />
+        <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Loading route editor...</div>}>
+          <RouteEditorModal
+            truck={editingTruck}
+            token={token}
+            onClose={() => setEditingTruck(null)}
+            onSave={() => api.getManagedTrucks(token).then(d => { if (d.success) setTrucks(d.data); })}
+          />
+        </Suspense>
       )}
     </div>
   );

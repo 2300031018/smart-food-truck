@@ -1,11 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import MapEmbed from '../components/MapEmbed';
 import { useSocketRooms } from '../hooks/useSocketRooms';
 import { formatCurrency } from '../utils/currency';
 import gsap from 'gsap';
+
+// Lazy load map component
+const MapEmbed = React.lazy(() => import('../components/MapEmbed'));
 
 export default function TruckDetail() {
   const { id } = useParams();
@@ -235,15 +237,17 @@ export default function TruckDetail() {
             </div>
 
             <div style={{ width: '100%', maxWidth: 500, height: 320, borderRadius: 24, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'var(--shadow-lg)', position: 'relative' }}>
-              <MapEmbed
-                height={320}
-                routePlan={truck.routePlan}
-                currentStopIndex={truck.currentStopIndex}
-                status={truck.status}
-                liveLocation={truck.liveLocation || truck.location}
-                truckId={truck.id || truck._id}
-                rounded={false}
-              />
+              <Suspense fallback={<div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9', color: '#64748b' }}>Loading map...</div>}>
+                <MapEmbed
+                  height={320}
+                  routePlan={truck.routePlan}
+                  currentStopIndex={truck.currentStopIndex}
+                  status={truck.status}
+                  liveLocation={truck.liveLocation || truck.location}
+                  truckId={truck.id || truck._id}
+                  rounded={false}
+                />
+              </Suspense>
             </div>
           </div>
         </div>

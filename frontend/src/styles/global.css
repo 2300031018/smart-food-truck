@@ -214,11 +214,29 @@ body.premium-theme {
 .premium-theme .custom-marker:hover {
     transform: rotate(-45deg) scale(1.2) !important;
 }
+
+/* Mobile Navigation */
+.nav-mobile-toggle {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 8px 12px;
+  z-index: 1001;
+}
+
+.nav-menu {
+  display: flex;
+  gap: 3rem;
+}
+
 /* Login Page Layout */
 .login-split-container {
   display: flex;
   min-height: calc(100vh - var(--nav-height));
   width: 100%;
+  flex-direction: row;
 }
 
 .login-form-side {
@@ -236,8 +254,166 @@ body.premium-theme {
   display: none;
 }
 
-@media (min-width: 768px) {
+/* MOBILE OPTIMIZATIONS */
+
+/* Extra Small Devices (320px - 480px) */
+@media (max-width: 480px) {
+  :root {
+    --nav-height: 60px;
+    --container-width: 100%;
+  }
+
+  body {
+    font-size: 14px;
+  }
+
+  .nav-mobile-toggle {
+    display: block;
+  }
+
+  .nav-menu {
+    display: none;
+    position: absolute;
+    top: 60px;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: 0;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 1rem 0;
+    z-index: 999;
+  }
+
+  .nav-menu.open {
+    display: flex;
+  }
+
+  .nav-menu a {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    display: block;
+  }
+
+  .premium-theme .container {
+    padding: 0 16px;
+  }
+
+  .premium-theme h1 {
+    font-size: 1.5rem;
+  }
+
+  .premium-theme h2 {
+    font-size: 1.25rem;
+  }
+
+  .premium-theme input,
+  .premium-theme textarea,
+  .premium-theme select {
+    font-size: 16px; /* Prevents auto zoom on focus */
+    padding: 10px 16px;
+  }
+
+  .premium-theme .btn-primary {
+    padding: 12px 20px;
+    min-height: 44px; /* Touch target size */
+    font-size: 0.95rem;
+  }
+
+  .login-split-container {
+    flex-direction: column;
+  }
+
+  .login-form-side {
+    padding: 24px;
+    min-height: 100vh;
+  }
+
+  .login-image-side {
+    display: none;
+  }
+}
+
+/* Small Devices (481px - 768px) */
+@media (min-width: 481px) and (max-width: 768px) {
+  :root {
+    --nav-height: 70px;
+  }
+
+  .nav-mobile-toggle {
+    display: block;
+  }
+
+  .nav-menu {
+    display: none;
+    position: absolute;
+    top: 70px;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: 0;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 1rem 0;
+    z-index: 999;
+  }
+
+  .nav-menu.open {
+    display: flex;
+  }
+
+  .nav-menu a {
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    display: block;
+  }
+
+  .premium-theme .container {
+    padding: 0 20px;
+  }
+
+  .premium-theme h1 {
+    font-size: 1.75rem;
+  }
+
+  .premium-theme input,
+  .premium-theme textarea,
+  .premium-theme select {
+    font-size: 16px;
+  }
+
+  .login-form-side {
+    padding: 32px;
+  }
+
+  .login-image-side {
+    display: none;
+  }
+}
+
+/* Tablets and up (769px+) */
+@media (min-width: 769px) {
+  .nav-mobile-toggle {
+    display: none;
+  }
+
+  .nav-menu {
+    display: flex !important;
+  }
+
   .login-image-side {
     display: block;
+  }
+}
+
+/* Medium Devices (769px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .premium-theme .container {
+    padding: 0 20px;
+  }
+}
+
+/* Large Devices (1025px+) */
+@media (min-width: 1025px) {
+  .premium-theme .container {
+    padding: 0 24px;
   }
 }

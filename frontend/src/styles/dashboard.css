@@ -23,6 +23,119 @@
   margin-bottom: 24px;
   padding-bottom: 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+/* MOBILE RESPONSIVE DASHBOARD STYLES */
+
+@media (max-width: 480px) {
+  .dashboard-container {
+    padding: 12px;
+  }
+
+  .card {
+    padding: 16px;
+    margin-bottom: 16px;
+    border-radius: 8px;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  p {
+    font-size: 0.9rem;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+  }
+
+  .data-table {
+    font-size: 0.8rem;
+    overflow-x: auto;
+    display: block;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 8px 12px;
+  }
+
+  input,
+  select,
+  textarea {
+    padding: 10px 12px;
+    font-size: 16px; /* Prevents zoom on mobile */
+  }
+
+  .btn {
+    min-height: 44px;
+    width: 100%;
+    margin-bottom: 8px;
+  }
+
+  .btn-sm {
+    width: auto;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .dashboard-container {
+    padding: 16px;
+  }
+
+  .card {
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .data-table {
+    font-size: 0.85rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 12px;
+  }
+
+  .btn {
+    min-height: 40px;
+  }
+}
+
+@media (min-width: 769px) {
+  .page-header {
+    flex-wrap: nowrap;
+  }
+
+  .btn {
+    min-height: auto;
+    width: auto;
+  }
 }
 
 /* Typography */

@@ -8,10 +8,14 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
+    
+    // Close mobile menu when route changes
+    setMobileMenuOpen(false);
 
     // Theme Switching Logic
     const isConsumerPath = ['/', '/login', '/signup', '/trucks', '/orders'].some(path =>
@@ -89,11 +93,11 @@ export default function Layout({ children }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 4rem'
+          padding: 'clamp(0.5rem, 2vw, 2rem) clamp(1rem, 4vw, 4rem)'
         }}
       >
         <Link to="/" style={{ 
-          fontSize: '1.5rem', 
+          fontSize: 'clamp(1rem, 3vw, 1.5rem)', 
           fontWeight: 800, 
           display: 'flex', 
           alignItems: 'center', 
@@ -108,11 +112,26 @@ export default function Layout({ children }) {
           <span style={{ color: scrolled || location.pathname !== '/' ? '#0f172a' : '#fff' }}>BITE</span>
         </Link>
 
-        <div style={{ display: 'flex', gap: '3rem', alignItems: 'center' }}>
+        {/* Mobile Hamburger Button */}
+        <button
+          className="nav-mobile-toggle"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          style={{
+            cursor: 'pointer',
+            color: scrolled || location.pathname !== '/' ? '#0f172a' : '#fff'
+          }}
+          aria-label="Toggle mobile menu"
+        >
+          {mobileMenuOpen ? '✕' : '☰'}
+        </button>
+
+        {/* Desktop Navigation */}
+        <div className="nav-menu" style={{ display: 'flex', gap: '3rem', alignItems: 'center' }}>
           {navLinks.map(link => (
             <Link
               key={link.to}
               to={link.to}
+              onClick={() => setMobileMenuOpen(false)}
               style={{
                 color: location.pathname === link.to ? 'var(--primary)' : (scrolled || location.pathname !== '/' ? 'var(--text-secondary)' : 'rgba(255,255,255,0.8)'),
                 fontWeight: 600,
@@ -127,10 +146,10 @@ export default function Layout({ children }) {
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 'clamp(0.75rem, 3vw, 1.5rem)', alignItems: 'center', justifyContent: 'flex-end' }}>
           {token ? (
             <div style={{ padding: '0.4rem 0.4rem 0.4rem 1.2rem', display: 'flex', alignItems: 'center', gap: '1rem', borderRadius: '50px', background: '#f1f5f9', border: '1px solid #e2e8f0' }}>
-              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155' }}>👋 {user?.name || 'User'}</span>
+              <span style={{ fontSize: 'clamp(0.75rem, 2vw, 0.9rem)', fontWeight: 600, color: '#334155' }}>👋 {user?.name || 'User'}</span>
               <button
                 onClick={handleLogout}
                 style={{
@@ -142,7 +161,12 @@ export default function Layout({ children }) {
                   fontWeight: 700,
                   border: 'none',
                   cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)'
+                  boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)',
+                  minHeight: '44px',
+                  minWidth: '44px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
               >
                 Logout
@@ -150,7 +174,7 @@ export default function Layout({ children }) {
             </div>
           ) : (
             <>
-              <Link to="/login" style={{ color: scrolled || location.pathname !== '/' ? 'var(--text-primary)' : '#fff', fontWeight: 600 }}>Login</Link>
+              <Link to="/login" style={{ color: scrolled || location.pathname !== '/' ? 'var(--text-primary)' : '#fff', fontWeight: 600, fontSize: 'clamp(0.8rem, 2vw, 0.95rem)' }}>Login</Link>
               <Link
                 to="/signup"
                 style={{
@@ -159,7 +183,11 @@ export default function Layout({ children }) {
                   padding: '0.8rem 2rem',
                   borderRadius: '50px',
                   fontWeight: 700,
-                  boxShadow: '0 8px 20px rgba(255, 107, 107, 0.25)'
+                  boxShadow: '0 8px 20px rgba(255, 107, 107, 0.25)',
+                  minHeight: '44px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  fontSize: 'clamp(0.8rem, 2vw, 1rem)'
                 }}
               >
                 Get Started
@@ -169,7 +197,7 @@ export default function Layout({ children }) {
         </div>
       </nav>
 
-      <main style={{ flex: 1, paddingTop: location.pathname === '/' ? 0 : '100px', minHeight: 'calc(100vh - 100px)' }}>
+      <main style={{ flex: 1, paddingTop: location.pathname === '/' ? 0 : 'calc(var(--nav-height) + 2rem)', minHeight: 'calc(100vh - var(--nav-height))' }}>
         {children}
       </main>
 

@@ -1,11 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 import { clearRoutePathsForTruck } from '../utils/routePathCache';
+import { useSocketRooms } from '../hooks/useSocketRooms';
+
+// Lazy load modal components
+const RouteEditorModal = React.lazy(() => import('../components/RouteEditorModal'));
 
 const STATUS_OPTIONS = ['OPEN', 'PREPARING', 'SERVING', 'SOLD_OUT', 'CLOSED', 'MOVING'];
-import RouteEditorModal from '../components/RouteEditorModal';
-import { useSocketRooms } from '../hooks/useSocketRooms';
 
 export default function AdminTrucks() {
   const { token, user } = useAuth();
@@ -281,12 +283,14 @@ export default function AdminTrucks() {
         </div>
       )}
       {editingTruck && (
-        <RouteEditorModal
-          truck={editingTruck}
-          token={token}
-          onClose={() => setEditingTruck(null)}
-          onSave={load}
-        />
+        <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Loading route editor...</div>}>
+          <RouteEditorModal
+            truck={editingTruck}
+            token={token}
+            onClose={() => setEditingTruck(null)}
+            onSave={load}
+          />
+        </Suspense>
       )}
     </div>
   );

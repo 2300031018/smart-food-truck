@@ -1,13 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import RouteEditorModal from '../components/RouteEditorModal';
 import { clearRoutePathsForTruck } from '../utils/routePathCache';
 import { useSocketRooms } from '../hooks/useSocketRooms';
 import gsap from 'gsap';
+
+// Lazy load modal
+const RouteEditorModal = React.lazy(() => import('../components/RouteEditorModal'));
 
 // Configuration
 const CITY_ZOOM = 5;

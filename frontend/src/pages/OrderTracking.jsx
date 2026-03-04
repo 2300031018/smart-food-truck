@@ -1,11 +1,13 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, Suspense } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
 import { useSocketRooms } from '../hooks/useSocketRooms';
-import MapEmbed from '../components/MapEmbed';
 import gsap from 'gsap';
+
+// Lazy load map component
+const MapEmbed = React.lazy(() => import('../components/MapEmbed'));
 
 const STEPS = ['PLACED', 'ACCEPTED', 'PREPARING', 'READY', 'COMPLETED'];
 
@@ -261,15 +263,17 @@ export default function OrderTracking() {
                         <div style={{ minHeight: 450, position: 'relative' }}>
                             {truck ? (
                                 <div className="glass-panel" style={{ height: 450, padding: 0, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'var(--shadow-lg)' }}>
-                                    <MapEmbed
-                                        height="450px"
-                                        routePlan={truck.routePlan}
-                                        currentStopIndex={truck.currentStopIndex}
-                                        status={truck.status}
-                                        liveLocation={truck.liveLocation || truck.location}
-                                        truckId={truck.id || truck._id}
-                                        rounded={false}
-                                    />
+                                    <Suspense fallback={<div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9', color: '#64748b' }}>Loading map...</div>}>
+                                        <MapEmbed
+                                            height="450px"
+                                            routePlan={truck.routePlan}
+                                            currentStopIndex={truck.currentStopIndex}
+                                            status={truck.status}
+                                            liveLocation={truck.liveLocation || truck.location}
+                                            truckId={truck.id || truck._id}
+                                            rounded={false}
+                                        />
+                                    </Suspense>
                                 </div>
                             ) : (
                                 <div className="glass-panel" style={{ height: 450, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.02)' }}>

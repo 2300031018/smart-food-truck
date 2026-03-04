@@ -1,22 +1,56 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Suspense } from 'react-router-dom';
+import React from 'react';
+
+// Eagerly loaded (init/auth pages)
 import Login from './pages/Login';
 import Signup from './pages/Signup';
-import Trucks from './pages/Trucks';
-import TruckDetail from './pages/TruckDetail';
-import MenuManage from './pages/MenuManage';
-import Orders from './pages/Orders';
 import Layout from './components/Layout';
 import RoleRoute from './components/RoleRoute';
-import DashboardAdmin from './pages/DashboardAdmin';
-import AdminManagers from './pages/AdminManagers';
-import AdminStaff from './pages/AdminStaff';
-import AdminTrucks from './pages/AdminTrucks';
-import AdminOrders from './pages/AdminOrders';
-import DashboardManager from './pages/DashboardManager';
-import ManagerStaff from './pages/ManagerStaff';
-import AnalyticsDashboard from './pages/AnalyticsDashboard';
-import StaffStock from './pages/StaffStock';
-import OrderTracking from './pages/OrderTracking';
+
+// Lazy loaded pages (heavy components)
+const Home = React.lazy(() => import('./pages/Home'));
+const Trucks = React.lazy(() => import('./pages/Trucks'));
+const TruckDetail = React.lazy(() => import('./pages/TruckDetail'));
+const MenuManage = React.lazy(() => import('./pages/MenuManage'));
+const Orders = React.lazy(() => import('./pages/Orders'));
+const OrderTracking = React.lazy(() => import('./pages/OrderTracking'));
+const DashboardAdmin = React.lazy(() => import('./pages/DashboardAdmin'));
+const AdminManagers = React.lazy(() => import('./pages/AdminManagers'));
+const AdminStaff = React.lazy(() => import('./pages/AdminStaff'));
+const AdminTrucks = React.lazy(() => import('./pages/AdminTrucks'));
+const AdminOrders = React.lazy(() => import('./pages/AdminOrders'));
+const DashboardManager = React.lazy(() => import('./pages/DashboardManager'));
+const ManagerStaff = React.lazy(() => import('./pages/ManagerStaff'));
+const AnalyticsDashboard = React.lazy(() => import('./pages/AnalyticsDashboard'));
+const StaffStock = React.lazy(() => import('./pages/StaffStock'));
+
+// Loading fallback component
+const LoadingSpinner = () => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '400px',
+    flexDirection: 'column',
+    gap: '1rem'
+  }}>
+    <div style={{
+      width: '40px',
+      height: '40px',
+      border: '4px solid #e2e8f0',
+      borderTop: '4px solid #ff6b6b',
+      borderRadius: '50%',
+      animation: 'spin 0.8s linear infinite'
+    }} />
+    <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Loading...</p>
+    <style>{`
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    `}</style>
+  </div>
+);
+
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 function Protected({ children }) {
@@ -27,18 +61,23 @@ function Protected({ children }) {
 
 function HomeRedirect() {
   const { token, user } = useAuth();
-  if (!token) return <Home />;
+  if (!token) return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <Home />
+    </Suspense>
+  );
 
   const role = user?.role;
   if (role === 'admin') return <Navigate to="/admin" replace />;
   if (role === 'manager') return <Navigate to="/manager" replace />;
   if (role === 'staff') return <Navigate to="/orders" replace />;
 
-  // Customers/Consumers can stay on Home
-  return <Home />;
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <Home />
+    </Suspense>
+  );
 }
-
-import Home from './pages/Home';
 
 export default function App() {
   return (
@@ -48,19 +87,19 @@ export default function App() {
           <Route path="/" element={
             <HomeRedirect />
           } />
-          <Route path="/home" element={<Home />} />
+          <Route path="/home" element={<Suspense fallback={<LoadingSpinner />}><Home /></Suspense>} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/trucks" element={<Trucks />} />
-          <Route path="/trucks/:id" element={<TruckDetail />} />
-          <Route path="/trucks/:id/menu-manage" element={<RoleRoute roles={['admin', 'manager']}><MenuManage /></RoleRoute>} />
-          <Route path="/admin" element={<RoleRoute roles={['admin']}><DashboardAdmin /></RoleRoute>} />
-          <Route path="/manager" element={<RoleRoute roles={['manager']}><DashboardManager /></RoleRoute>} />
-          <Route path="/manager/staff" element={<RoleRoute roles={['manager']}><ManagerStaff /></RoleRoute>} />
-          <Route path="/staff/stock" element={<RoleRoute roles={['staff']}><StaffStock /></RoleRoute>} />
-          <Route path="/orders" element={<Protected><Orders /></Protected>} />
-          <Route path="/orders/:id" element={<Protected><OrderTracking /></Protected>} />
-          <Route path="/analytics" element={<RoleRoute roles={['admin', 'manager']}><AnalyticsDashboard /></RoleRoute>} />
+          <Route path="/trucks" element={<Suspense fallback={<LoadingSpinner />}><Trucks /></Suspense>} />
+          <Route path="/trucks/:id" element={<Suspense fallback={<LoadingSpinner />}><TruckDetail /></Suspense>} />
+          <Route path="/trucks/:id/menu-manage" element={<RoleRoute roles={['admin', 'manager']}><Suspense fallback={<LoadingSpinner />}><MenuManage /></Suspense></RoleRoute>} />
+          <Route path="/admin" element={<RoleRoute roles={['admin']}><Suspense fallback={<LoadingSpinner />}><DashboardAdmin /></Suspense></RoleRoute>} />
+          <Route path="/manager" element={<RoleRoute roles={['manager']}><Suspense fallback={<LoadingSpinner />}><DashboardManager /></Suspense></RoleRoute>} />
+          <Route path="/manager/staff" element={<RoleRoute roles={['manager']}><Suspense fallback={<LoadingSpinner />}><ManagerStaff /></Suspense></RoleRoute>} />
+          <Route path="/staff/stock" element={<RoleRoute roles={['staff']}><Suspense fallback={<LoadingSpinner />}><StaffStock /></Suspense></RoleRoute>} />
+          <Route path="/orders" element={<Protected><Suspense fallback={<LoadingSpinner />}><Orders /></Suspense></Protected>} />
+          <Route path="/orders/:id" element={<Protected><Suspense fallback={<LoadingSpinner />}><OrderTracking /></Suspense></Protected>} />
+          <Route path="/analytics" element={<RoleRoute roles={['admin', 'manager']}><Suspense fallback={<LoadingSpinner />}><AnalyticsDashboard /></Suspense></RoleRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
