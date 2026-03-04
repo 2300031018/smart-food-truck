@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom';
 import L from 'leaflet';
 import App from './App';
 import 'leaflet/dist/leaflet.css';
@@ -17,26 +17,10 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow
 });
 
-const router = createBrowserRouter(
-  [
-    { path: '/*', element: <App /> }
-  ],
-  {
-    future: {
-      v7_startTransition: true,
-      v7_relativeSplatPath: true
-    }
-  }
-);
-
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <RouterProvider
-      router={router}
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true
-      }}
-    />
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </React.StrictMode>
 );
