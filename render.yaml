@@ -16,7 +16,7 @@ services:
   - type: static
     name: smart-food-truck-frontend
     rootDir: frontend
-    buildCommand: npm install --legacy-peer-deps && npm run build
+    buildCommand: npm install && npm run build
     publishDir: dist
     envVars:
       - key: VITE_API_URL
