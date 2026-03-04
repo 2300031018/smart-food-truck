@@ -17,7 +17,10 @@ services:
         sync: false
 
   # Frontend Service (Static Site)
-  - type: static
+  
+  
+    NODE_VERSION=20
+    type: static
     name: smart-food-truck-frontend
     rootDir: frontend
     buildCommand: npm install && npm run build
