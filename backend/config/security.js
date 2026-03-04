@@ -9,8 +9,7 @@ const defaultWhitelist = [
   'http://127.0.0.1:5173',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
-  'http://127.0.0.1:2999',
-  'https://pranavtummalasmartfoodtruck.app'
+  'http://127.0.0.1:2999'
 ];
 const whitelistOverride = (process.env.CORS_WHITELIST || defaultWhitelist.join(',')).split(',').map(o => o.trim()).filter(Boolean);
 const allowLocalOrigin = origin => typeof origin === 'string' && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(origin);

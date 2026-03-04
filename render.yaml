@@ -1,35 +1,32 @@
 services:
+  # Backend Service
   - type: web
     name: smart-food-truck-backend
-    env: node
-    plan: free
+    runtime: node
     rootDir: backend
     buildCommand: npm install
-    startCommand: npm start
+    startCommand: node server.js
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: MONGO_URI
         sync: false
       - key: JWT_SECRET
         sync: false
       - key: CORS_WHITELIST
         sync: false
-      - key: NODE_ENV
-        value: production
-      - key: NODE_VERSION
-        value: 20.11.0
 
-staticSites:
-  - name: smart-food-truck-frontend
+  # Frontend Service (Static Site)
+  - type: static
+    name: smart-food-truck-frontend
     rootDir: frontend
     buildCommand: npm install && npm run build
-    staticPublishPath: ./dist
+    publishDir: dist
     envVars:
-      - key: VITE_API_TARGET
+      - key: VITE_API_URL
         fromService:
           type: web
           name: smart-food-truck-backend
           property: url
-    routes:
-      - type: rewrite
-        source: '/*'
-        destination: /index.html
+      - key: NODE_VERSION
+        value: 20.12.2
