@@ -170,16 +170,6 @@ export default function Layout({ children }) {
               <Link 
                 to="/login" 
                 className="nav-link-auth"
-                style={{
-                  padding: '10px 24px',
-                  borderRadius: '12px',
-                  fontWeight: 600,
-                  fontSize: 'clamp(0.8rem, 2vw, 0.95rem)',
-                  color: '#1e293b',
-                  background: 'rgba(241, 245, 249, 0.6)',
-                  border: '2px solid transparent',
-                  transition: 'all 0.3s ease'
-                }}
               >
                 Login
               </Link>
