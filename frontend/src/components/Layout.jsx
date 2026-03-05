@@ -132,7 +132,14 @@ export default function Layout({ children }) {
               key={link.to}
               to={link.to}
               onClick={() => setMobileMenuOpen(false)}
-              className={`nav-link ${location.pathname === link.to ? 'active' : ''}`}
+              style={{
+                color: location.pathname === link.to ? 'var(--primary)' : (scrolled || location.pathname !== '/' ? '#334155' : 'rgba(255,255,255,0.95)'),
+                fontWeight: 600,
+                fontSize: '0.95rem',
+                position: 'relative',
+                transition: 'color 0.3s ease'
+              }}
+              className="nav-link"
             >
               {link.label}
             </Link>
@@ -167,27 +174,20 @@ export default function Layout({ children }) {
             </div>
           ) : (
             <>
-              <Link 
-                to="/login" 
-                className="nav-link-auth"
-              >
-                Login
-              </Link>
+              <Link to="/login" style={{ color: scrolled || location.pathname !== '/' ? 'var(--text-primary)' : '#fff', fontWeight: 600, fontSize: 'clamp(0.8rem, 2vw, 0.95rem)' }}>Login</Link>
               <Link
                 to="/signup"
-                className="nav-link-signup"
                 style={{
-                  background: 'linear-gradient(135deg, #ff6b6b 0%, #ff8e8e 100%)',
+                  background: 'var(--primary)',
                   color: '#fff',
-                  padding: '10px 28px',
-                  borderRadius: '12px',
+                  padding: '0.8rem 2rem',
+                  borderRadius: '50px',
                   fontWeight: 700,
-                  boxShadow: '0 6px 20px rgba(255, 107, 107, 0.4)',
+                  boxShadow: '0 8px 20px rgba(255, 107, 107, 0.25)',
                   minHeight: '44px',
                   display: 'flex',
                   alignItems: 'center',
-                  fontSize: 'clamp(0.8rem, 2vw, 1rem)',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                  fontSize: 'clamp(0.8rem, 2vw, 1rem)'
                 }}
               >
                 Get Started
