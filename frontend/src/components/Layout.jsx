@@ -132,14 +132,7 @@ export default function Layout({ children }) {
               key={link.to}
               to={link.to}
               onClick={() => setMobileMenuOpen(false)}
-              style={{
-                color: location.pathname === link.to ? 'var(--primary)' : (scrolled || location.pathname !== '/' ? 'var(--text-secondary)' : 'rgba(255,255,255,0.8)'),
-                fontWeight: 600,
-                fontSize: '0.95rem',
-                position: 'relative',
-                transition: 'color 0.3s ease'
-              }}
-              className="nav-link"
+              className={`nav-link ${location.pathname === link.to ? 'active' : ''}`}
             >
               {link.label}
             </Link>
@@ -174,20 +167,37 @@ export default function Layout({ children }) {
             </div>
           ) : (
             <>
-              <Link to="/login" style={{ color: scrolled || location.pathname !== '/' ? 'var(--text-primary)' : '#fff', fontWeight: 600, fontSize: 'clamp(0.8rem, 2vw, 0.95rem)' }}>Login</Link>
+              <Link 
+                to="/login" 
+                className="nav-link-auth"
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: '12px',
+                  fontWeight: 600,
+                  fontSize: 'clamp(0.8rem, 2vw, 0.95rem)',
+                  color: '#1e293b',
+                  background: 'rgba(241, 245, 249, 0.6)',
+                  border: '2px solid transparent',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                Login
+              </Link>
               <Link
                 to="/signup"
+                className="nav-link-signup"
                 style={{
-                  background: 'var(--primary)',
+                  background: 'linear-gradient(135deg, #ff6b6b 0%, #ff8e8e 100%)',
                   color: '#fff',
-                  padding: '0.8rem 2rem',
-                  borderRadius: '50px',
+                  padding: '10px 28px',
+                  borderRadius: '12px',
                   fontWeight: 700,
-                  boxShadow: '0 8px 20px rgba(255, 107, 107, 0.25)',
+                  boxShadow: '0 6px 20px rgba(255, 107, 107, 0.4)',
                   minHeight: '44px',
                   display: 'flex',
                   alignItems: 'center',
-                  fontSize: 'clamp(0.8rem, 2vw, 1rem)'
+                  fontSize: 'clamp(0.8rem, 2vw, 1rem)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                 }}
               >
                 Get Started
