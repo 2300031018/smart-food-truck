@@ -125,8 +125,8 @@ export default function Layout({ children }) {
           {mobileMenuOpen ? '✕' : '☰'}
         </button>
 
-        {/* Desktop Navigation */}
-        <div className="nav-menu" style={{ display: 'flex', gap: '3rem', alignItems: 'center' }}>
+        {/* Navigation Menu */}
+        <div className={`nav-menu ${mobileMenuOpen ? 'open' : ''}`}>
           {navLinks.map(link => (
             <Link
               key={link.to}

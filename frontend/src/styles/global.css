@@ -279,9 +279,12 @@ body.premium-theme {
     right: 0;
     flex-direction: column;
     gap: 0;
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     padding: 1rem 0;
     z-index: 999;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   }
 
   .nav-menu.open {
@@ -351,9 +354,12 @@ body.premium-theme {
     right: 0;
     flex-direction: column;
     gap: 0;
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     padding: 1rem 0;
     z-index: 999;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   }
 
   .nav-menu.open {
@@ -397,6 +403,17 @@ body.premium-theme {
 
   .nav-menu {
     display: flex !important;
+    flex-direction: row;
+    gap: 3rem;
+    align-items: center;
+    position: static;
+    background: none;
+    padding: 0;
+  }
+
+  .nav-menu a {
+    padding: 0;
+    border-bottom: none;
   }
 
   .login-image-side {
