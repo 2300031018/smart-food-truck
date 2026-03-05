@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { api } from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -11,11 +12,8 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (token) {
-      // Sync user profile on load/token change
-      fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-        .then(res => res.json())
+      // Sync user profile on load/token change using centralized API client
+      api.me(token)
         .then(res => {
           if (res.success && res.data?.user) {
             const updatedUser = { ...user, ...res.data.user };
