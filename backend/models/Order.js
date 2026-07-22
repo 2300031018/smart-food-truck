@@ -15,9 +15,8 @@ const OrderItemSchema = new mongoose.Schema(
 // Keep legacy statuses in enum temporarily for backward compatibility; normalize in controller.
 const OrderSchema = new mongoose.Schema(
   {
-    customer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    truck: { type: mongoose.Schema.Types.ObjectId, ref: 'Truck', required: true, index: true },
-    // Snapshot fields to make historical lookups easier and show names in DB/UI without extra joins
+    // Note: `customer` and `truck` ObjectId refs removed by design.
+    // Use `customerSnapshot.id` and `truckSnapshot.id` for internal references if needed.
     customerSnapshot: {
       id: { type: mongoose.Schema.Types.ObjectId },
       name: { type: String },
@@ -27,6 +26,9 @@ const OrderSchema = new mongoose.Schema(
       id: { type: mongoose.Schema.Types.ObjectId },
       name: { type: String }
     },
+    // Also provide denormalized top-level name fields for easy DB viewing/UI
+    customerName: { type: String },
+    truckName: { type: String },
     // Formatted date/time fields for quick inspection (dd-mm-yyyy and 12-hour time)
     placedDate: { type: String }, // e.g. 22-07-2026
     placedTime12: { type: String }, // e.g. 4:03 PM
@@ -37,14 +39,14 @@ const OrderSchema = new mongoose.Schema(
     paymentStatus: { type: String, enum: ['unpaid', 'paid', 'refunded'], default: 'unpaid' },
     pickupStopId: { type: String },
     notes: { type: String },
-    placedAt: { type: Date, default: Date.now, index: true },
+    // Note: `placedAt`, `createdAt`, and `updatedAt` intentionally removed per destructive migration request.
     readyAt: { type: Date },
     completedAt: { type: Date },
     deliveredAt: { type: Date },
     cancelledAt: { type: Date },
     cancelReason: { type: String }
   },
-  { timestamps: true }
+  {}
 );
 
 OrderSchema.pre('validate', function (next) {
@@ -55,8 +57,8 @@ OrderSchema.pre('validate', function (next) {
   next();
 });
 
-OrderSchema.index({ truck: 1, createdAt: -1 });
-OrderSchema.index({ customer: 1, createdAt: -1 });
-OrderSchema.index({ status: 1, createdAt: -1 });
+OrderSchema.index({ 'truckSnapshot.id': 1, '_id': -1 });
+OrderSchema.index({ 'customerSnapshot.id': 1, '_id': -1 });
+OrderSchema.index({ status: 1, '_id': -1 });
 
 module.exports = mongoose.model('Order', OrderSchema);

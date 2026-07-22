@@ -140,8 +140,6 @@ exports.createOrder = asyncHandler(async (req, res) => {
   const placedDate = formatDate(placed);
   const placedTime12 = formatTime12(placed);
   const order = await Order.create({
-    customer: customer._id,
-    truck: truckId,
     items,
     total,
     notes,
@@ -149,9 +147,10 @@ exports.createOrder = asyncHandler(async (req, res) => {
     status: 'PLACED',
     customerSnapshot: { id: customer._id, name: userInfo?.name || '', email: userInfo?.email || '' },
     truckSnapshot: { id: truckId, name: truckInfo?.name || '' },
+    customerName: userInfo?.name || userInfo?.email || '',
+    truckName: truckInfo?.name || '',
     placedDate,
-    placedTime12,
-    placedAt: placed
+    placedTime12
   });
   try {
     emitOrderCreated(order, { truckId, customerId: req.user.id, managerId: truck.manager });
@@ -166,7 +165,7 @@ exports.createOrder = asyncHandler(async (req, res) => {
 exports.getOrders = asyncHandler(async (req, res) => {
   const baseQuery = {};
   if (req.user.role === 'customer') {
-    baseQuery.customer = req.user.id;
+    baseQuery['customerSnapshot.id'] = req.user.id;
   } else if (req.user.role === 'admin') {
     // no filter
   } else if (req.user.role === 'staff') {
@@ -174,19 +173,17 @@ exports.getOrders = asyncHandler(async (req, res) => {
     if (!req.user.assignedTruck) {
       return res.json({ success: true, data: [] });
     }
-    baseQuery.truck = req.user.assignedTruck;
+    baseQuery['truckSnapshot.id'] = req.user.assignedTruck;
   } else { // manager
     const trucks = await Truck.find({ manager: req.user.id }).select('_id');
     const ids = trucks.map(t => t._id);
     if (ids.length === 0) {
       return res.json({ success: true, data: [] });
     }
-    baseQuery.truck = { $in: ids };
+    baseQuery['truckSnapshot.id'] = { $in: ids };
   }
   const orders = await Order.find(baseQuery)
-    .populate('customer', 'id name email role isActive')
-    .populate('truck', 'id name')
-    .sort({ createdAt: -1 })
+    .sort({ _id: -1 })
     .lean();
   orders.forEach(o => normalizeOrderRecord(o));
   res.json({ success: true, data: orders });
@@ -194,24 +191,21 @@ exports.getOrders = asyncHandler(async (req, res) => {
 
 // GET /api/orders/:id
 exports.getOrder = asyncHandler(async (req, res) => {
-  const order = await Order.findById(req.params.id)
-    .populate('customer', 'id name email role isActive')
-    .populate('truck', 'id name');
+  const order = await Order.findById(req.params.id);
   if (!order) return res.status(404).json({ success: false, error: { message: 'Order not found' } });
   normalizeOrderRecord(order);
   // Authorization check
-  const orderCustomerId = (order.customer && (order.customer._id || order.customer.id))
-    ? String(order.customer._id || order.customer.id)
-    : String(order.customer);
+  const orderCustomerId = order.customerSnapshot && (order.customerSnapshot.id) ? String(order.customerSnapshot.id) : null;
   if (req.user.role === 'customer' && orderCustomerId !== req.user.id) {
     return res.status(403).json({ success: false, error: { message: 'Forbidden' } });
   }
   if (req.user.role === 'staff') {
-    if (!req.user.assignedTruck || order.truck.toString() !== req.user.assignedTruck) {
+    const orderTruckId = order.truckSnapshot && order.truckSnapshot.id ? String(order.truckSnapshot.id) : null;
+    if (!req.user.assignedTruck || orderTruckId !== req.user.assignedTruck) {
       return res.status(403).json({ success: false, error: { message: 'Forbidden' } });
     }
   } else if (req.user.role === 'manager') {
-    const truck = await Truck.findOne({ _id: order.truck, manager: req.user.id }).select('_id');
+    const truck = await Truck.findOne({ _id: order.truckSnapshot && order.truckSnapshot.id, manager: req.user.id }).select('_id');
     if (!truck) return res.status(403).json({ success: false, error: { message: 'Forbidden' } });
   }
   res.json({ success: true, data: order });
@@ -235,19 +229,20 @@ exports.updateStatus = asyncHandler(async (req, res) => {
     order.cancelReason = reason || 'Customer cancelled';
     await order.save();
     try {
-      const managerId = await resolveManagerId(order.truck);
-      emitOrderUpdate(order, { truckId: order.truck, customerId: order.customer, managerId });
+      const managerId = await resolveManagerId(order.truckSnapshot && order.truckSnapshot.id);
+      emitOrderUpdate(order, { truckId: order.truckSnapshot && order.truckSnapshot.id, customerId: order.customerSnapshot && order.customerSnapshot.id, managerId });
     } catch { }
     return res.json({ success: true, data: order });
   }
 
   // Staff / Manager authorization to operate on this truck
   if (req.user.role === 'staff') {
-    if (!req.user.assignedTruck || order.truck.toString() !== req.user.assignedTruck) {
+    const orderTruckId = order.truckSnapshot && order.truckSnapshot.id ? String(order.truckSnapshot.id) : null;
+    if (!req.user.assignedTruck || orderTruckId !== req.user.assignedTruck) {
       return res.status(403).json({ success: false, error: { message: 'Forbidden' } });
     }
   } else if (req.user.role === 'manager') {
-    const truck = await Truck.findOne({ _id: order.truck, manager: req.user.id }).select('_id');
+    const truck = await Truck.findOne({ _id: order.truckSnapshot && order.truckSnapshot.id, manager: req.user.id }).select('_id');
     if (!truck) return res.status(403).json({ success: false, error: { message: 'Forbidden' } });
   }
 
@@ -287,8 +282,8 @@ exports.updateStatus = asyncHandler(async (req, res) => {
   }
   await order.save();
   try {
-    const managerId = await resolveManagerId(order.truck);
-    emitOrderUpdate(order, { truckId: order.truck, customerId: order.customer, managerId });
+    const managerId = await resolveManagerId(order.truckSnapshot && order.truckSnapshot.id);
+    emitOrderUpdate(order, { truckId: order.truckSnapshot && order.truckSnapshot.id, customerId: order.customerSnapshot && order.customerSnapshot.id, managerId });
   } catch { }
   res.json({ success: true, data: order });
 });
