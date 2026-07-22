@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
+import { formatDate, formatTime12 } from '../utils/date';
 import gsap from 'gsap';
 
 export default function Orders() {
@@ -18,8 +19,13 @@ export default function Orders() {
     api.getOrders(token)
       .then(res => {
         if (mounted && res.success) {
-          // Sort by date desc
-          const sorted = (res.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          // Sort by insertion order desc using _id (ObjectId timestamp), fallback to placedDate
+          const sorted = (res.data || []).sort((a, b) => {
+            if (a._id && b._id) return String(b._id).localeCompare(String(a._id));
+            const da = a.placedDate ? new Date(a.placedDate.split('-').reverse().join('-')) : 0;
+            const db = b.placedDate ? new Date(b.placedDate.split('-').reverse().join('-')) : 0;
+            return db - da;
+          });
           setOrders(sorted);
         }
       })
@@ -111,7 +117,7 @@ function OrderCard({ order, active }) {
 
   const status = order.status || 'PLACED';
   const badgeClass = statusBadges[status] || 'badge-blue';
-  const truckName = typeof order.truck === 'object' ? order.truck.name : 'Food Truck';
+  const truckName = order.truckName || (order.truckSnapshot && order.truckSnapshot.name) || 'Food Truck';
 
   return (
     <div
@@ -139,7 +145,7 @@ function OrderCard({ order, active }) {
         <div>
           <h4 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)' }}>{truckName}</h4>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-            {new Date(order.createdAt).toLocaleDateString()} · {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {order.placedDate || ''} · {order.placedTime12 || ''}
           </div>
         </div>
         <span className={`badge ${badgeClass}`} style={{ textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 800 }}>

@@ -92,6 +92,7 @@ export default function AdminOrders() {
             <thead>
               <tr>
                 <th>Order ID</th>
+                <th>Customer</th>
                 <th>Truck</th>
                 <th>Total</th>
                 <th>Status</th>
@@ -100,8 +101,10 @@ export default function AdminOrders() {
             </thead>
             <tbody>
               {orders.map(o => {
-                const truckId = typeof o.truck === 'object' ? (o.truck.id || o.truck._id) : o.truck;
-                const truckName = typeof o.truck === 'object' ? o.truck.name : (truckNames[truckId] || shortId(truckId));
+                const truckId = o.truckSnapshot?.id || (typeof o.truck === 'object' ? (o.truck.id || o.truck._id) : o.truck);
+                const truckName = o.truckName || o.truckSnapshot?.name || (truckNames[truckId] || shortId(truckId));
+                const customerName = o.customerName || o.customerSnapshot?.name || shortId(o.customerSnapshot?.id);
+                const customerEmail = o.customerSnapshot?.email || null;
 
                 const statusBadgeMap = {
                   PLACED: 'badge-gray',
@@ -116,6 +119,10 @@ export default function AdminOrders() {
                 return (
                   <tr key={o._id}>
                     <td><code style={{ color: 'var(--primary)', fontWeight: 600 }}>#{shortId(o._id)}</code></td>
+                    <td>
+                      <strong>{customerName}</strong>
+                      {customerEmail ? <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{customerEmail}</div> : null}
+                    </td>
                     <td><strong>{truckName}</strong></td>
                     <td style={{ fontWeight: 700 }}>{formatCurrency(o.total || 0)}</td>
                     <td>
@@ -123,12 +130,12 @@ export default function AdminOrders() {
                         {o.status}
                       </span>
                     </td>
-                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{formatTS(o.createdAt)}</td>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{o.placedDate ? `${o.placedDate} ${o.placedTime12 || ''}` : '—'}</td>
                   </tr>
                 );
               })}
               {orders.length === 0 && (
-                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 30, color: 'var(--text-secondary)' }}>No orders found.</td></tr>
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--text-secondary)' }}>No orders found.</td></tr>
               )}
             </tbody>
           </table>
@@ -139,19 +146,11 @@ export default function AdminOrders() {
 }
 
 function shortId(id) { return id ? String(id).slice(-6) : '—'; }
+import { formatDate, formatTime12 } from '../utils/date';
+
 function formatTS(ts) {
   if (!ts) return '—';
-  try {
-    const date = new Date(ts);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${day}/${month}/${year} ${hours}:${minutes}`;
-  } catch {
-    return '—';
-  }
+  return `${formatDate(ts)} ${formatTime12(ts)}`;
 }
 const th = { textAlign: 'left', padding: 6, background: '#f5f5f5', border: '1px solid #ddd', fontSize: 12 };
 const td = { padding: 6, border: '1px solid #eee', fontSize: 13 };

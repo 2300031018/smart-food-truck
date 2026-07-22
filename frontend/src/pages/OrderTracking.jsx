@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
+import { formatDate, formatTime12 } from '../utils/date';
 import { useSocketRooms } from '../hooks/useSocketRooms';
 import gsap from 'gsap';
 
@@ -48,9 +49,9 @@ export default function OrderTracking() {
                 if (res.success && mounted) {
                     setOrder(res.data);
                     // Fetch truck for location
-                    if (res.data.truck) {
+                    const truckId = res.data.truckSnapshot?.id || (res.data.truck && (typeof res.data.truck === 'string' ? res.data.truck : res.data.truck.id || res.data.truck._id));
+                    if (truckId) {
                         try {
-                            const truckId = typeof res.data.truck === 'string' ? res.data.truck : res.data.truck.id || res.data.truck._id;
                             const tRes = await api.getTruck(truckId);
                             if (tRes.success && mounted) setTruck(tRes.data);
                         } catch (e) { console.error('Failed to load truck loc', e); }
@@ -127,7 +128,13 @@ export default function OrderTracking() {
                     <Link to="/orders" style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
                         <span style={{ fontSize: '1.2rem' }}>←</span> All Orders
                     </Link>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600, background: 'rgba(0,0,0,0.03)', padding: '4px 12px', borderRadius: '20px' }}>ID: {id.slice(-8).toUpperCase()}</div>
+                                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600, background: 'rgba(0,0,0,0.03)', padding: '4px 12px', borderRadius: '20px' }}>ID: {id.slice(-8).toUpperCase()}</div>
+                                    <div style={{ textAlign: 'right', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                        <div><strong>Customer:</strong> {order.customerName || (order.customerSnapshot && order.customerSnapshot.name) || '—'}</div>
+                                        <div><strong>Truck:</strong> {order.truckName || (order.truckSnapshot && order.truckSnapshot.name) || (truck && truck.name) || '—'}</div>
+                                    </div>
+                                </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 48, alignItems: 'start' }}>
