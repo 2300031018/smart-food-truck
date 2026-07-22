@@ -1,6 +1,7 @@
 const Order = require('../models/Order');
 const MenuItem = require('../models/MenuItem');
 const Truck = require('../models/Truck');
+const User = require('../models/User');
 const asyncHandler = require('../utils/asyncHandler');
 const { emitOrderCreated, emitOrderUpdate } = require('../socket');
 
@@ -15,6 +16,21 @@ const ORDER_STATUS_ALIASES = {
   completed: 'COMPLETED',
   cancelled: 'CANCELLED'
 };
+
+function pad(n) { return n < 10 ? '0' + n : String(n); }
+function formatDate(dt) {
+  const d = new Date(dt);
+  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
+}
+function formatTime12(dt) {
+  const d = new Date(dt);
+  let h = d.getHours();
+  const m = pad(d.getMinutes());
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${m} ${ampm}`;
+}
 
 function normalizeOrderStatus(value) {
   if (!value) return null;
@@ -85,6 +101,17 @@ exports.createOrder = asyncHandler(async (req, res) => {
     const err = new Error(`Missing required fields: ${missing.join(',')}`);
     err.statusCode = 422; throw err;
   }
+
+  const customer = await User.findById(req.user.id).select('_id role isActive');
+  if (!customer || !customer.isActive) {
+    const err = new Error('Account not found or inactive. Please sign in again.');
+    err.statusCode = 401; throw err;
+  }
+  if (customer.role !== 'customer') {
+    const err = new Error('Only customer accounts can place orders');
+    err.statusCode = 403; throw err;
+  }
+
   const truck = await Truck.findById(truckId).select('_id manager staff isActive status');
   if (!truck || !truck.isActive) {
     const err = new Error('Truck inactive or not found');
@@ -106,7 +133,26 @@ exports.createOrder = asyncHandler(async (req, res) => {
 
   const items = await buildItems(truckId, rawItems);
   const total = items.reduce((s, i) => s + i.lineTotal, 0);
-  const order = await Order.create({ customer: req.user.id, truck: truckId, items, total, notes, pickupStopId, status: 'PLACED' });
+  // Build snapshots and formatted date/time for DB readability
+  const userInfo = await User.findById(req.user.id).select('name email').lean();
+  const truckInfo = await Truck.findById(truckId).select('name').lean();
+  const placed = new Date();
+  const placedDate = formatDate(placed);
+  const placedTime12 = formatTime12(placed);
+  const order = await Order.create({
+    customer: customer._id,
+    truck: truckId,
+    items,
+    total,
+    notes,
+    pickupStopId,
+    status: 'PLACED',
+    customerSnapshot: { id: customer._id, name: userInfo?.name || '', email: userInfo?.email || '' },
+    truckSnapshot: { id: truckId, name: truckInfo?.name || '' },
+    placedDate,
+    placedTime12,
+    placedAt: placed
+  });
   try {
     emitOrderCreated(order, { truckId, customerId: req.user.id, managerId: truck.manager });
   } catch { }
@@ -137,18 +183,27 @@ exports.getOrders = asyncHandler(async (req, res) => {
     }
     baseQuery.truck = { $in: ids };
   }
-  const orders = await Order.find(baseQuery).sort({ createdAt: -1 }).lean();
+  const orders = await Order.find(baseQuery)
+    .populate('customer', 'id name email role isActive')
+    .populate('truck', 'id name')
+    .sort({ createdAt: -1 })
+    .lean();
   orders.forEach(o => normalizeOrderRecord(o));
   res.json({ success: true, data: orders });
 });
 
 // GET /api/orders/:id
 exports.getOrder = asyncHandler(async (req, res) => {
-  const order = await Order.findById(req.params.id);
+  const order = await Order.findById(req.params.id)
+    .populate('customer', 'id name email role isActive')
+    .populate('truck', 'id name');
   if (!order) return res.status(404).json({ success: false, error: { message: 'Order not found' } });
   normalizeOrderRecord(order);
   // Authorization check
-  if (req.user.role === 'customer' && order.customer.toString() !== req.user.id) {
+  const orderCustomerId = (order.customer && (order.customer._id || order.customer.id))
+    ? String(order.customer._id || order.customer.id)
+    : String(order.customer);
+  if (req.user.role === 'customer' && orderCustomerId !== req.user.id) {
     return res.status(403).json({ success: false, error: { message: 'Forbidden' } });
   }
   if (req.user.role === 'staff') {
