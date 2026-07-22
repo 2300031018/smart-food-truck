@@ -7,7 +7,7 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "backfill:orders": "node scripts/backfillOrders.js",
-    "strip:orders": "node scripts/stripOrderFields.js"
+    "strip:orders": "node scripts/stripOrderFields.js",
     "lint": "eslint . --ext .js",
     "test": "echo \"No tests yet\" && exit 0"
   },
