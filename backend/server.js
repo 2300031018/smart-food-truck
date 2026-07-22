@@ -13,8 +13,6 @@ if (!process.env.MONGO_URI) {
 	console.warn('MONGO_URI not set. Will attempt local fallback (mongodb://127.0.0.1:27017/smart-food-truck).');
 }
 
-connectDB();
-
 const security = require('./config/security');
 const app = express();
 app.disable('x-powered-by');
@@ -53,7 +51,18 @@ const server = http.createServer(app);
 const { initSocket } = require('./socket');
 initSocket(server);
 const { startTruckAutoUpdate } = require('./utils/truckRouteSimulator');
-startTruckAutoUpdate();
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+async function startServer() {
+	try {
+		await connectDB();
+		startTruckAutoUpdate();
+		server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+	} catch (err) {
+		console.error('Startup failed:', err.message);
+		process.exit(1);
+	}
+}
+
+startServer();

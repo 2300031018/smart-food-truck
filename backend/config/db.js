@@ -12,21 +12,21 @@ const connectOnce = async (uri) => {
 
 const connectDB = async () => {
   const primaryUri = process.env.MONGO_URI;
-  try {
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  if (primaryUri) {
     await connectOnce(primaryUri);
     console.log('MongoDB Connected');
-  } catch (err) {
-    console.error('Mongo connection error:', err.message);
-    // Try local fallback if primary is missing or SRV/DNS failed
-    try {
-      console.warn('Attempting local MongoDB fallback:', DEFAULT_LOCAL_URI);
-      await connectOnce(DEFAULT_LOCAL_URI);
-      console.log('MongoDB Connected (local fallback)');
-    } catch (fallbackErr) {
-      console.error('Fallback Mongo connection error:', fallbackErr.message);
-      process.exit(1);
-    }
+    return;
   }
+
+  if (isProduction) {
+    throw new Error('MONGO_URI is required in production');
+  }
+
+  console.warn('MONGO_URI not set. Using local MongoDB fallback:', DEFAULT_LOCAL_URI);
+  await connectOnce(DEFAULT_LOCAL_URI);
+  console.log('MongoDB Connected (local fallback)');
 };
 
 module.exports = connectDB;
