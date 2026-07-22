@@ -151,11 +151,5 @@ export default function AdminOrders() {
 }
 
 function shortId(id) { return id ? String(id).slice(-6) : '—'; }
-import { formatDate, formatTime12 } from '../utils/date';
-
-function formatTS(ts) {
-  if (!ts) return '—';
-  return `${formatDate(ts)} ${formatTime12(ts)}`;
-}
 const th = { textAlign: 'left', padding: 6, background: '#f5f5f5', border: '1px solid #ddd', fontSize: 12 };
 const td = { padding: 6, border: '1px solid #eee', fontSize: 13 };
