@@ -17,6 +17,19 @@ const OrderSchema = new mongoose.Schema(
   {
     customer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     truck: { type: mongoose.Schema.Types.ObjectId, ref: 'Truck', required: true, index: true },
+    // Snapshot fields to make historical lookups easier and show names in DB/UI without extra joins
+    customerSnapshot: {
+      id: { type: mongoose.Schema.Types.ObjectId },
+      name: { type: String },
+      email: { type: String }
+    },
+    truckSnapshot: {
+      id: { type: mongoose.Schema.Types.ObjectId },
+      name: { type: String }
+    },
+    // Formatted date/time fields for quick inspection (dd-mm-yyyy and 12-hour time)
+    placedDate: { type: String }, // e.g. 22-07-2026
+    placedTime12: { type: String }, // e.g. 4:03 PM
     staff: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // assigned/claiming staff
     items: { type: [OrderItemSchema], validate: v => v.length > 0 },
     status: { type: String, enum: ['PLACED', 'ACCEPTED', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED', 'pending', 'accepted', 'preparing', 'ready', 'delivered', 'completed', 'cancelled'], default: 'PLACED', index: true },

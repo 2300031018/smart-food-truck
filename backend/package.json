@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "backfill:orders": "node scripts/backfillOrders.js",
     "lint": "eslint . --ext .js",
     "test": "echo \"No tests yet\" && exit 0"
   },
