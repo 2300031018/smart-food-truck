@@ -83,10 +83,10 @@ export default function Orders() {
             Active Orders
           </h3>
           <div ref={listRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
-            {activeOrders.map(order => (
-              <OrderCard key={order._id || order.id} order={order} active />
-            ))}
-          </div>
+                {activeOrders.map(order => (
+                  <OrderCard key={order._id || order.id} order={order} active />
+                ))}
+              </div>
         </div>
       )}
 
@@ -143,7 +143,8 @@ function OrderCard({ order, active }) {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 15, alignItems: 'flex-start' }}>
         <div>
-          <h4 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)' }}>{truckName}</h4>
+          <h4 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--text-primary)' }}>{order.customerName || (order.customerSnapshot && order.customerSnapshot.name) || 'Customer'}</h4>
+          <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginTop: 6, fontWeight: 600 }}>{truckName}</div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
             {order.placedDate || ''} · {order.placedTime12 || ''}
           </div>

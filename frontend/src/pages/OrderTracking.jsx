@@ -131,8 +131,9 @@ export default function OrderTracking() {
                                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                                     <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600, background: 'rgba(0,0,0,0.03)', padding: '4px 12px', borderRadius: '20px' }}>ID: {id.slice(-8).toUpperCase()}</div>
                                     <div style={{ textAlign: 'right', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                                        <div><strong>Customer:</strong> {order.customerName || (order.customerSnapshot && order.customerSnapshot.name) || '—'}</div>
-                                        <div><strong>Truck:</strong> {order.truckName || (order.truckSnapshot && order.truckSnapshot.name) || (truck && truck.name) || '—'}</div>
+                                        <div style={{ fontWeight: 800 }}>{order.customerName || (order.customerSnapshot && order.customerSnapshot.name) || '—'}</div>
+                                        <div style={{ marginTop: 6 }}>{order.truckName || (order.truckSnapshot && order.truckSnapshot.name) || (truck && truck.name) || '—'}</div>
+                                        <div style={{ marginTop: 8, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{order.placedDate ? `${order.placedDate} ${order.placedTime12 || ''}` : ''}</div>
                                     </div>
                                 </div>
                 </div>

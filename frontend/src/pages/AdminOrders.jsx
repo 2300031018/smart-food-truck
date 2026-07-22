@@ -91,13 +91,14 @@ export default function AdminOrders() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Order ID</th>
-                <th>Customer</th>
-                <th>Truck</th>
-                <th>Total</th>
-                <th>Status</th>
-                <th>Created At</th>
-              </tr>
+                  <th>Order ID</th>
+                  <th>Customer</th>
+                  <th>Truck</th>
+                  <th>Order Details</th>
+                  <th>Total</th>
+                  <th>Status</th>
+                  <th>Placed</th>
+                </tr>
             </thead>
             <tbody>
               {orders.map(o => {
@@ -124,6 +125,10 @@ export default function AdminOrders() {
                       {customerEmail ? <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{customerEmail}</div> : null}
                     </td>
                     <td><strong>{truckName}</strong></td>
+                    <td>
+                      <div style={{ fontWeight: 700 }}>{o.items?.length || 0} {o.items?.length === 1 ? 'item' : 'items'}</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{(o.items || []).map(i => i.name).slice(0,3).join(', ')}{(o.items||[]).length>3? '...' : ''}</div>
+                    </td>
                     <td style={{ fontWeight: 700 }}>{formatCurrency(o.total || 0)}</td>
                     <td>
                       <span className={`badge ${statusBadgeMap[o.status] || 'badge-gray'}`}>
